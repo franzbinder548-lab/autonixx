@@ -217,7 +217,7 @@
         {% for acc in session_data.accounts %}
         <a
           class="rail-account-option {% if acc.account == session_data.activeAccount.account %}active{% endif %}"
-          href="/auth/switch/{{ acc.account }}"
+          href="{{ url_for('switch_account_get', account_id=acc.account, next=request.full_path) }}"
         >
           <div class="rail-acc-info">
             <span class="rail-acc-id">{{ acc.account }}</span>

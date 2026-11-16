@@ -969,6 +969,12 @@
     tbody.innerHTML = rows;
   };
 
+  window.addEventListener("displaycurrencychange", function () {
+    window.renderReports();
+    updatePositionsPanel();
+    updateSessionStats();
+  });
+
   function escHtml(s) {
     return String(s)
       .replace(/&/g, "&amp;")

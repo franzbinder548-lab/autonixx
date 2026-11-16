@@ -1221,8 +1221,10 @@ def google_callback():
 def logout():
     if not _valid_csrf():
         return jsonify({"error": "csrf_validation_failed"}), 400
-    session.pop("autonix_user_id", None)
-    session.pop("autonix_csrf_token", None)
+    cleanup_deriv_session = current_app.config.get("AUTONIX_DERIV_SESSION_CLEANUP")
+    if callable(cleanup_deriv_session):
+        cleanup_deriv_session()
+    session.clear()
     return redirect("/")
 
 

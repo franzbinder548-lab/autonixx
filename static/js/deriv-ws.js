@@ -454,7 +454,7 @@
     var balEl = document.querySelector(".account-balance");
     if (balEl && loginid === state.accountId) {
       balEl.textContent = window.AutonixCurrency
-        ? window.AutonixCurrency.format(balance)
+        ? window.AutonixCurrency.formatAccount(balance, currency)
         : currency + " " + parseFloat(balance).toFixed(2);
     }
   }

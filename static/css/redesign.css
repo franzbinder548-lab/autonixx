@@ -4762,7 +4762,7 @@ textarea,
 }
 .navbar-account-id { font-weight: 700; font-size: 12px; }
 .navbar-account-type { font-weight: 800; font-size: 11px; color: var(--color-brand,#FF444F); }
-.navbar-account-balance { font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.navbar-account-balance { font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .navbar-account-tag { background: rgba(255,255,255,.08); border-radius: 4px; padding: 1px 5px; font-size: 10px; font-weight: 700; }
 .navbar-account-dropdown {
   display: none;
@@ -4875,7 +4875,7 @@ textarea,
   .navbar-account-wrap { display: block; }
   .navbar-account-btn { gap: 4px; padding: 4px 7px; }
   .navbar-account-type,
-  .navbar-account-balance { font-size: 10px; }
+  .navbar-account-balance { font-size: 11px; }
   .nav-hamburger { display: flex; }
   .rail-dashboard-link { display: none !important; }
 }

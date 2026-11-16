@@ -129,6 +129,25 @@ class AutonixAuthTests(unittest.TestCase):
         self.client.post("/account/logout", data={"csrf_token": self._csrf()})
 
         self._register("second@example.com")
+        with self.client.session_transaction() as user_session:
+            user_session["user"] = {
+                "isAuthenticated": True,
+                "activeAccount": {
+                    "account": "CR100001",
+                    "currency": "USD",
+                    "isVirtual": False,
+                    "accountType": "real",
+                    "balance": 0,
+                },
+                "accounts": [{
+                    "account": "CR100001",
+                    "currency": "USD",
+                    "isVirtual": False,
+                    "accountType": "real",
+                    "balance": 0,
+                }],
+                "_accessToken": "",
+            }
         dashboard = self.client.get("/dashboard")
         self.assertEqual(dashboard.status_code, 200)
         self.assertIn(b"One or more Deriv accounts are linked to another Autonix profile.", dashboard.data)
@@ -378,6 +397,9 @@ class AutonixAuthTests(unittest.TestCase):
         self.assertEqual(dashboard.status_code, 200)
         self.assertIn(b"CR100001", dashboard.data)
         self.assertIn(b"Deriv account connected", dashboard.data)
+        self.assertIn(b'id="navbar-account-balance"', dashboard.data)
+        self.assertIn(b"data-account-active-balance", dashboard.data)
+        self.assertIn(b"data-account-amount=", dashboard.data)
         self.assertIn(b'href="#dashboard-accounts"', dashboard.data)
         self.assertIn(b'href="/auth/logout"', dashboard.data)
         self.assertEqual(dashboard.data.count(b'id="dash-live-chart"'), 1)
@@ -391,6 +413,81 @@ class AutonixAuthTests(unittest.TestCase):
             self.assertEqual(user_session["autonix_user_id"], user_id)
             self.assertNotIn("user", user_session)
         self.assertFalse(self.client.get("/account/profile").json["deriv_connected"])
+
+    def test_autonix_logout_revokes_deriv_tokens_and_clears_the_entire_session(self):
+        self._register()
+        with self.client.session_transaction() as user_session:
+            user_session["user"] = {
+                "isAuthenticated": True,
+                "activeAccount": {
+                    "account": "CR100001",
+                    "balance": 0,
+                    "currency": "USD",
+                    "isVirtual": False,
+                },
+                "accounts": [{
+                    "account": "CR100001",
+                    "balance": 0,
+                    "currency": "USD",
+                    "isVirtual": False,
+                    "token": "account-token",
+                }],
+                "_accessToken": "access-token",
+                "_refreshToken": "refresh-token",
+            }
+
+        self.client.get("/dashboard")
+        with patch.object(flask_app, "_try_revoke") as revoke:
+            response = self.client.post(
+                "/account/logout",
+                data={"csrf_token": self._csrf()},
+            )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertCountEqual(
+            [call.args[0] for call in revoke.call_args_list],
+            ["access-token", "refresh-token", "account-token"],
+        )
+        with self.client.session_transaction() as user_session:
+            self.assertEqual(dict(user_session), {})
+
+    def test_orphaned_deriv_session_is_removed(self):
+        with self.client.session_transaction() as user_session:
+            user_session["user"] = {
+                "isAuthenticated": True,
+                "_accessToken": "orphan-token",
+                "accounts": [],
+            }
+
+        with patch.object(flask_app, "_try_revoke") as revoke:
+            response = self.client.get("/")
+
+        self.assertEqual(response.status_code, 200)
+        revoke.assert_called_once_with("orphan-token")
+        with self.client.session_transaction() as user_session:
+            self.assertNotIn("user", user_session)
+
+    def test_get_account_switch_returns_to_safe_current_page(self):
+        self._register()
+        with self.client.session_transaction() as user_session:
+            user_session["user"] = {
+                "isAuthenticated": True,
+                "activeAccount": {"account": "CR100001"},
+                "accounts": [{"account": "CR100001", "token": ""}],
+                "_accessToken": "",
+            }
+
+        response = self.client.get(
+            "/auth/switch/CR100001?next=%2Fbots%3Ftab%3Doverview"
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.headers["Location"], "/bots?tab=overview")
+
+        response = self.client.get(
+            "/auth/switch/CR100001?next=https%3A%2F%2Fexample.com%2Fsteal"
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.headers["Location"], "/trader")
 
     def test_password_reset_reports_missing_smtp_configuration_without_fake_success(self):
         self.client.get("/password/forgot")

@@ -584,6 +584,11 @@
     }).join("");
   }
 
+  window.addEventListener("displaycurrencychange", function () {
+    renderLiveSummary();
+    renderTable();
+  });
+
   /* ─── Status pill ─────────────────────────────────────────────── */
   function setStatus(type, text) {
     var p = $id("bulk-status-pill");

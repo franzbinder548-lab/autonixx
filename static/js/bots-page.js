@@ -2448,6 +2448,14 @@
     }
   }
 
+  window.addEventListener("displaycurrencychange", function () {
+    BOT_DEFS.forEach(function (def) {
+      renderBot(states[def.id]);
+    });
+    renderSummary();
+    renderHistoryCard();
+  });
+
   /* ─── Connection watcher ─────────────────────────────────────── */
   function watchConnection() {
     if (!window.DerivWS) return;

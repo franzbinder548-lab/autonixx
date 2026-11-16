@@ -101,12 +101,20 @@
       <div class="navbar-account-wrap" id="navbar-account-wrap">
         <button class="navbar-account-btn" id="navbar-account-btn" aria-expanded="false" aria-haspopup="true">
           <span class="navbar-account-type" id="navbar-account-type">{{ 'D0' if session_data.activeAccount.isVirtual else 'R0' }}</span>
-          <span class="navbar-account-balance" id="navbar-account-balance">{{ "{:,.2f}".format(session_data.activeAccount.balance|float) }} {{ session_data.activeAccount.currency }}</span>
+          <span
+            class="navbar-account-balance"
+            id="navbar-account-balance"
+            data-account-balance
+            data-account-active-balance
+            data-account-amount="{{ session_data.activeAccount.balance }}"
+            data-account-currency="{{ session_data.activeAccount.currency }}"
+            data-account-id="{{ session_data.activeAccount.account }}"
+          >{{ "{:,.2f}".format(session_data.activeAccount.balance|float) }} {{ session_data.activeAccount.currency }}</span>
           <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 4l4 4 4-4"/></svg>
         </button>
         <div class="navbar-account-dropdown" id="navbar-account-dropdown">
           {% for acc in session_data.accounts %}
-          <a class="navbar-acct-opt {% if acc.account == session_data.activeAccount.account %}active{% endif %}" href="/auth/switch/{{ acc.account }}">
+          <a class="navbar-acct-opt {% if acc.account == session_data.activeAccount.account %}active{% endif %}" href="{{ url_for('switch_account_get', account_id=acc.account, next=request.full_path) }}">
             <span>{{ acc.account }}</span>
             <span class="navbar-acct-tag">{{ 'Demo' if acc.isVirtual else acc.currency }}</span>
           </a>

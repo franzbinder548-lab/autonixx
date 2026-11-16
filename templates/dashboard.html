@@ -77,10 +77,15 @@
         <h2 class="dash-section-title" id="dash-accounts-heading">Your Accounts</h2>
         <div class="dash-accounts-grid" role="list">
           {% for acc in session_data.accounts %}
-          <a href="/auth/switch/{{ acc.account }}" class="dash-account-card {% if acc.account == session_data.activeAccount.account %}dash-account-active{% endif %}" role="listitem" aria-current="{{ 'true' if acc.account == session_data.activeAccount.account else 'false' }}">
+          <a href="{{ url_for('switch_account_get', account_id=acc.account, next=request.full_path) }}" class="dash-account-card {% if acc.account == session_data.activeAccount.account %}dash-account-active{% endif %}" role="listitem" aria-current="{{ 'true' if acc.account == session_data.activeAccount.account else 'false' }}">
             <div class="dash-acct-top"><span class="dash-acct-avatar" aria-hidden="true">{{ acc.account[:2] }}</span>{% if acc.account == session_data.activeAccount.account %}<span class="dash-acct-active-badge">Active</span>{% else %}<span class="dash-acct-switch-hint">Switch</span>{% endif %}</div>
             <div class="dash-acct-id">{{ acc.account }}</div>
             <div class="dash-acct-type">{% if acc.isVirtual %}<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Demo Account{% else %}<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> Real &bull; {{ acc.currency }}{% endif %}</div>
+            {% if acc.balance is defined and acc.currency is defined %}
+            <div class="dash-acct-balance" data-account-balance data-account-amount="{{ acc.balance }}" data-account-currency="{{ acc.currency }}" data-account-id="{{ acc.account }}">{{ "{:,.2f}".format(acc.balance|float) }} {{ acc.currency }}</div>
+            {% else %}
+            <div class="dash-acct-balance">Balance unavailable</div>
+            {% endif %}
           </a>
           {% endfor %}
         </div>
@@ -175,10 +180,23 @@ document.addEventListener("derivBalance", function (e) {
     feedback.hidden = !message;
     feedback.className = "dash-transfer-feedback " + (isSuccess ? "is-success" : "is-error");
   }
-  function label(item) { return item.label + " · " + Number(item.balance || 0).toFixed(2) + " " + item.currency; }
+  function formatBalance(item) {
+    return window.AutonixCurrency
+      ? window.AutonixCurrency.formatAccount(item.balance, item.currency)
+      : Number(item.balance || 0).toFixed(2) + " " + item.currency;
+  }
+  function renderTransferOptions() {
+    var selectedSource = sourceSelect.value;
+    var selectedDestination = destinationSelect.value;
+    sourceSelect.innerHTML = records.map(function (item) { return '<option value="' + item.id + '">' + item.label + " · " + formatBalance(item) + '</option>'; }).join("");
+    destinationSelect.innerHTML = records.map(function (item) { return '<option value="' + item.id + '">' + item.label + " · " + formatBalance(item) + '</option>'; }).join("");
+    if (records.some(function (item) { return item.id === selectedSource; })) sourceSelect.value = selectedSource;
+    if (records.some(function (item) { return item.id === selectedDestination; })) destinationSelect.value = selectedDestination;
+    if (!selectedSource && records.length > 1) destinationSelect.selectedIndex = 1;
+  }
   function updateSource() {
     var item = records.find(function (record) { return record.id === sourceSelect.value; });
-    sourceInfo.textContent = item ? "Available balance: " + Number(item.balance || 0).toFixed(2) + " " + item.currency : "Select a source account to view its available balance.";
+    sourceInfo.textContent = item ? "Available balance: " + formatBalance(item) : "Select a source account to view its available balance.";
     currency.textContent = item ? item.currency : "—";
   }
   function openTransfer() {
@@ -186,9 +204,7 @@ document.addEventListener("derivBalance", function (e) {
     showFeedback("Loading your wallets and eligible accounts…", false);
     fetch("/dashboard/api/transfers/options", { credentials: "same-origin" }).then(function (response) { return response.json().then(function (data) { if (!response.ok) throw new Error(data.detail?.error || data.error || "Unable to load transfer accounts."); return data; }); }).then(function (data) {
       records = data.sources || [];
-      sourceSelect.innerHTML = records.map(function (item) { return '<option value="' + item.id + '">' + label(item) + '</option>'; }).join("");
-      destinationSelect.innerHTML = records.map(function (item) { return '<option value="' + item.id + '">' + label(item) + '</option>'; }).join("");
-      if (records.length > 1) destinationSelect.selectedIndex = 1;
+      renderTransferOptions();
       showFeedback(""); updateSource();
     }).catch(function (error) { showFeedback(error.message, false); });
   }
@@ -214,7 +230,12 @@ document.addEventListener("derivBalance", function (e) {
     submit.disabled = true; submit.textContent = "Transferring…";
     fetch("/dashboard/api/transfers", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ source_id: sourceSelect.value, destination_id: destinationSelect.value, amount: amountInput.value, description: document.getElementById("transfer-description").value }) }).then(function (response) { return response.json().then(function (data) { if (!response.ok) throw new Error(data.error || "Transfer failed."); return data; }); }).then(function (data) { showFeedback("Transfer completed: " + data.amount + " " + data.currency + ". Balances are being refreshed.", true); breakdown.hidden = true; validation = null; busy = false; submit.type = "submit"; submit.disabled = false; submit.textContent = "Validate transfer"; amountInput.value = ""; loadFinance(); }).catch(function (error) { showFeedback(error.message, false); busy = false; submit.disabled = false; submit.textContent = "Validate transfer"; validation = null; submit.type = "submit"; });
   }
-  function loadFinance() { var grid = document.getElementById("dash-finance-grid"); if (!grid) return; fetch("/dashboard/api/transfers/options", { credentials: "same-origin" }).then(function (response) { return response.json(); }).then(function (data) { grid.innerHTML = (data.sources || []).map(function (item) { return '<div class="dash-finance-card"><div class="dash-finance-card-top"><span>' + (item.kind === "wallet" ? "Wallet" : "Trading account") + '</span><b>' + item.currency + '</b></div><strong>' + Number(item.balance || 0).toFixed(2) + '</strong><small>' + item.label + '</small></div>'; }).join("") || '<div class="dash-finance-placeholder">No eligible accounts found.</div>'; }).catch(function () { grid.innerHTML = '<div class="dash-finance-placeholder">Wallet balances are temporarily unavailable.</div>'; }); }
+  function loadFinance() { var grid = document.getElementById("dash-finance-grid"); if (!grid) return; fetch("/dashboard/api/transfers/options", { credentials: "same-origin" }).then(function (response) { return response.json(); }).then(function (data) { grid.innerHTML = (data.sources || []).map(function (item) { return '<div class="dash-finance-card"><div class="dash-finance-card-top"><span>' + (item.kind === "wallet" ? "Wallet" : "Trading account") + '</span><b>' + item.currency + '</b></div><strong data-account-balance data-account-amount="' + Number(item.balance || 0) + '" data-account-currency="' + item.currency + '">' + formatBalance(item) + '</strong><small>' + item.label + '</small></div>'; }).join("") || '<div class="dash-finance-placeholder">No eligible accounts found.</div>'; if (window.AutonixCurrency) window.AutonixCurrency.renderAccountBalances(); }).catch(function () { grid.innerHTML = '<div class="dash-finance-placeholder">Wallet balances are temporarily unavailable.</div>'; }); }
+  window.addEventListener("displaycurrencychange", function () {
+    renderTransferOptions();
+    updateSource();
+    if (window.AutonixCurrency) window.AutonixCurrency.renderAccountBalances();
+  });
   function initLiveChart() {
     var canvas = document.getElementById("dash-live-chart");
     var status = document.getElementById("dash-chart-status");

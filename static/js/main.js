@@ -147,6 +147,9 @@
   var currentTickUnsubscribe = null;
 
   function formatAccountBalance(balance, currency) {
+    if (window.AutonixCurrency) {
+      return window.AutonixCurrency.formatAccount(balance, currency);
+    }
     var amount = Number(balance);
     if (!Number.isFinite(amount)) return "— " + (currency || "");
     return (
@@ -180,15 +183,13 @@
         null,
         account,
         function (bal, cur) {
-          var balEl = document.querySelector(".account-balance");
           var navBalance = document.getElementById("navbar-account-balance");
-          var formattedBalance = formatAccountBalance(bal, cur);
-          if (balEl) {
-            balEl.textContent = window.AutonixCurrency
-              ? window.AutonixCurrency.format(bal)
-              : cur + " " + parseFloat(bal).toFixed(2);
+          if (navBalance) {
+            navBalance.setAttribute("data-account-amount", bal);
+            navBalance.setAttribute("data-account-currency", cur || "USD");
+            if (account) navBalance.setAttribute("data-account-id", account);
+            navBalance.textContent = formatAccountBalance(bal, cur);
           }
-          if (navBalance) navBalance.textContent = formattedBalance;
         },
         wsUrl,
         currency,
@@ -314,20 +315,21 @@
         /* Update SESSION_DATA with new active account */
         var sd = window.SESSION_DATA;
         if (sd && sd.accounts) {
-          var newActive = sd.accounts.find(function (a) {
+          var newActive = data.activeAccount || sd.accounts.find(function (a) {
             return a.account === accountId;
           });
           if (newActive) {
+            if (Array.isArray(data.accounts)) sd.accounts = data.accounts;
             sd.activeAccount = newActive;
             /* Update UI: account chip */
             var navType = document.getElementById("navbar-account-type");
             if (navType) navType.textContent = newActive.isVirtual ? "D0" : "R0";
             var navBalance = document.getElementById("navbar-account-balance");
             if (navBalance) {
-              navBalance.textContent = formatAccountBalance(
-                newActive.balance,
-                newActive.currency,
-              );
+              navBalance.setAttribute("data-account-id", newActive.account);
+              navBalance.setAttribute("data-account-amount", newActive.balance);
+              navBalance.setAttribute("data-account-currency", newActive.currency);
+              navBalance.textContent = formatAccountBalance(newActive.balance, newActive.currency);
             }
             var chip = document.getElementById("account-chip");
             if (chip) {
@@ -336,18 +338,24 @@
               if (avatar)
                 avatar.textContent = newActive.account.substring(0, 2);
               if (balance)
-                balance.textContent =
-                  newActive.currency +
-                  " " +
-                  parseFloat(newActive.balance || 0).toFixed(2);
+                balance.textContent = formatAccountBalance(newActive.balance, newActive.currency);
             }
 
             /* Update bots page account display if present */
             var botsDisplay = document.getElementById("bots-balance-display");
             if (botsDisplay) {
-              var demoTag = newActive.isVirtual ? " • Demo" : "";
-              botsDisplay.textContent = newActive.account + demoTag;
+              botsDisplay.setAttribute("data-account-id", newActive.account);
+              botsDisplay.setAttribute("data-account-amount", newActive.balance);
+              botsDisplay.setAttribute("data-account-currency", newActive.currency);
+              botsDisplay.textContent = formatAccountBalance(newActive.balance, newActive.currency);
             }
+            document.dispatchEvent(new CustomEvent("derivBalance", {
+              detail: {
+                balance: newActive.balance,
+                currency: newActive.currency,
+                loginid: newActive.account,
+              },
+            }));
 
             /* Update left rail account display if present */
             var railAvatar = document.querySelector(

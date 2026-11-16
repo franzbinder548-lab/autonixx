@@ -44,10 +44,15 @@
             <span class="bots-summary-label">Account</span>
 
             {% if session_data and session_data.isAuthenticated %}
-            <span class="bots-balance-sub" id="bots-balance-display"
-              >{{ session_data.activeAccount.account }}{% if
-              session_data.activeAccount.isVirtual %} • Demo{% endif %}</span
-            >
+            <span
+              class="bots-balance-sub"
+              id="bots-balance-display"
+              data-account-balance
+              data-account-active-balance
+              data-account-amount="{{ session_data.activeAccount.balance }}"
+              data-account-currency="{{ session_data.activeAccount.currency }}"
+              data-account-id="{{ session_data.activeAccount.account }}"
+            >{{ "{:,.2f}".format(session_data.activeAccount.balance|float) }} {{ session_data.activeAccount.currency }}</span>
             {% else %}
             <span class="bots-balance-sub" id="bots-balance-display">Connect Deriv to view balance</span>
             {% endif %}

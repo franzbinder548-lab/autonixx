@@ -313,6 +313,50 @@ def _try_revoke(token: str) -> None:
         pass
 
 
+def _terminate_deriv_session() -> None:
+    """Revoke Deriv tokens and clear its identity while preserving Autonix state."""
+    user = session.get("user") or {}
+    accounts = user.get("accounts", [])
+    tokens = {
+        token
+        for token in (
+            user.get("_accessToken"),
+            user.get("_refreshToken"),
+            *(
+                account.get("token")
+                for account in accounts
+                if isinstance(account, dict)
+            ),
+        )
+        if token
+    }
+    for token in tokens:
+        _try_revoke(token)
+
+    autonix_user_id = session.get("autonix_user_id")
+    if autonix_user_id:
+        try:
+            set_deriv_connection(autonix_user_id, False)
+        except sqlite3.Error:
+            app.logger.exception("Could not update Autonix Deriv connection status")
+    session.pop("user", None)
+    session.pop("autonix_deriv_link_error", None)
+
+
+app.config["AUTONIX_DERIV_SESSION_CLEANUP"] = _terminate_deriv_session
+
+
+@app.before_request
+def require_autonix_for_deriv_session():
+    if "user" not in session:
+        return None
+    if get_current_autonix_user():
+        return None
+    _terminate_deriv_session()
+    session.clear()
+    return None
+
+
 def _is_api_token(token: str) -> bool:
     """
     Return True if token looks like a Deriv API token (a1-xxx, short alphanumeric).
@@ -1865,18 +1909,8 @@ def logout_get():
     GET-based logout — used by nav <a> links for reliable session clearing.
     Revokes tokens server-side, clears session, redirects home with no-cache headers.
     """
-    user = session.get("user")
-    if user:
-        _try_revoke(user.get("_accessToken", ""))
-        rt = user.get("_refreshToken")
-        if rt:
-            _try_revoke(rt)
     autonix_user_id = session.get("autonix_user_id")
-    if autonix_user_id:
-        try:
-            set_deriv_connection(autonix_user_id, False)
-        except sqlite3.Error:
-            app.logger.exception("Could not update Autonix Deriv connection status")
+    _terminate_deriv_session()
     session.clear()
     if autonix_user_id:
         session["autonix_user_id"] = autonix_user_id
@@ -1889,18 +1923,8 @@ def logout_get():
 @app.route("/auth/session", methods=["DELETE"])
 def logout():
     """Legacy DELETE endpoint — kept for compatibility."""
-    user = session.get("user")
-    if user:
-        _try_revoke(user.get("_accessToken", ""))
-        rt = user.get("_refreshToken")
-        if rt:
-            _try_revoke(rt)
     autonix_user_id = session.get("autonix_user_id")
-    if autonix_user_id:
-        try:
-            set_deriv_connection(autonix_user_id, False)
-        except sqlite3.Error:
-            app.logger.exception("Could not update Autonix Deriv connection status")
+    _terminate_deriv_session()
     session.clear()
     if autonix_user_id:
         session["autonix_user_id"] = autonix_user_id
@@ -1914,10 +1938,11 @@ def logout():
 def switch_account_get(account_id):
     """
     GET-based account switch — used by nav <a> links.
-    Updates the active account in the session and redirects home with no-cache headers.
+    Updates the active account and returns to a safe local page.
     """
     user = session.get("user")
-    if not user:
+    if not user or not get_current_autonix_user():
+        _terminate_deriv_session()
         return redirect("/")
     accounts = user.get("accounts", [])
     target = next((a for a in accounts if a["account"] == account_id), None)
@@ -1929,7 +1954,16 @@ def switch_account_get(account_id):
             _refresh_session_account_balances(user, user["_accessToken"])
         session["user"] = user
         session.modified = True
-    resp = make_response(redirect("/dashboard"))
+    destination = request.args.get("next") or request.referrer or "/trader"
+    parsed = urllib.parse.urlsplit(destination)
+    if "\\" in destination or parsed.scheme or parsed.netloc:
+        if parsed.netloc.lower() != request.host.lower() or parsed.scheme not in {"http", "https"}:
+            destination = "/trader"
+        else:
+            destination = urllib.parse.urlunsplit(("", "", parsed.path or "/", parsed.query, parsed.fragment))
+    if not destination.startswith("/") or destination.startswith("//"):
+        destination = "/trader"
+    resp = make_response(redirect(destination))
     resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     resp.headers["Pragma"] = "no-cache"
     return resp

@@ -27,6 +27,13 @@ from flask import (
 )
 from flask_cors import CORS
 from dotenv import load_dotenv
+from autonix_auth import (
+    autonix_auth,
+    get_autonix_csrf_token,
+    get_current_autonix_user,
+    link_deriv_accounts,
+    set_deriv_connection,
+)
 
 BASE_DIR = Path(__file__).resolve().parent
 PROJECT_DIR = BASE_DIR
@@ -53,6 +60,7 @@ app.config["SESSION_COOKIE_SECURE"] = (
 )
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(hours=8)
+app.register_blueprint(autonix_auth)
 
 
 @app.before_request
@@ -136,6 +144,16 @@ REDIRECT_URL = os.getenv("REDIRECT_URL", "").rstrip("/")
 @app.context_processor
 def inject_public_ws_url():
     return {"public_ws_url": DERIV_PUBLIC_WS_URL}
+
+
+@app.context_processor
+def inject_autonix_user():
+    return {
+        "autonix_user": get_current_autonix_user(),
+        "autonix_csrf_token": get_autonix_csrf_token(),
+    }
+
+
 APK_DOWNLOAD_PATH = os.getenv("APK_DOWNLOAD_PATH", "Autonix.apk")
 APK_FILE = (BASE_DIR / APK_DOWNLOAD_PATH).resolve()
 
@@ -514,6 +532,37 @@ def _build_accounts_session(
         ).isoformat(),
     }
     session.permanent = True
+    _associate_autonix_deriv_accounts(accounts)
+
+
+def _associate_autonix_deriv_accounts(accounts=None):
+    autonix_user_id = session.get("autonix_user_id")
+    if not autonix_user_id:
+        return False
+    if accounts is None:
+        deriv_user = session.get("user") or {}
+        if deriv_user.get("isAuthenticated") is not True:
+            session.pop("autonix_deriv_link_error", None)
+            return False
+        accounts = deriv_user.get("accounts", [])
+    try:
+        conflicts = link_deriv_accounts(autonix_user_id, accounts)
+        if conflicts:
+            session["autonix_deriv_link_error"] = (
+                "One or more Deriv accounts are linked to another Autonix profile."
+            )
+            return False
+        if not any(str(account.get("account") or "").strip() for account in accounts):
+            session.pop("autonix_deriv_link_error", None)
+            return False
+        session.pop("autonix_deriv_link_error", None)
+        return True
+    except sqlite3.Error:
+        app.logger.exception("Could not associate Deriv accounts with Autonix user")
+        session["autonix_deriv_link_error"] = (
+            "Deriv connected, but the account association could not be saved."
+        )
+        return False
 
 
 def _safe_for_template(user: dict) -> dict:
@@ -918,7 +967,10 @@ def _handle_oauth_callback():
                     "[OIDC] OTP flow failed — auto-redirecting to legacy OAuth "
                     "so the user gets real API tokens without manual action"
                 )
+                autonix_user_id = session.get("autonix_user_id")
                 session.clear()  # don't keep a half-baked session
+                if autonix_user_id:
+                    session["autonix_user_id"] = autonix_user_id
                 params = urllib.parse.urlencode({"app_id": DERIV_LEGACY_APP_ID})
                 return redirect(f"https://oauth.deriv.com/oauth2/authorize?{params}")
 
@@ -1106,13 +1158,55 @@ def terms():
 
 @app.route("/dashboard")
 def dashboard():
-    user = session.get("user")
+    autonix_user = get_current_autonix_user()
+    if not autonix_user:
+        return redirect(
+            url_for("autonix_auth.login", next=request.path)
+        )
+    deriv_connected = _associate_autonix_deriv_accounts()
+    user = session.get("user") if deriv_connected else None
     response = make_response(render_template(
         "dashboard.html",
         deriv_app_id=DERIV_APP_ID,
         ws_app_id=DERIV_WS_APP_ID,
         redirect_url=REDIRECT_URL,
         session_data=_safe_for_template(user),
+        autonix_user=autonix_user,
+        deriv_connected=deriv_connected,
+        dashboard_bots=[
+            {
+                "id": "over1AiPredictor",
+                "name": "Expert Bot",
+                "tier": "Expert",
+                "summary": "Selective Over 1 entries from configurable recent tick digits.",
+                "features": ("Configurable tick window", "Selective entries", "Session loss limit"),
+                "access": "Expert activation required",
+            },
+            {
+                "id": "freeBot",
+                "name": "Free Bot",
+                "tier": "Free",
+                "summary": "Tick-based Over / Under, Matches / Differs, and Rise / Fall strategies.",
+                "features": ("Three strategy modes", "Configurable tick analysis", "Take-profit and stop-loss controls"),
+                "access": "Free access",
+            },
+            {
+                "id": "bulkTrader",
+                "name": "Bulk Trader",
+                "tier": "Multi Trade",
+                "summary": "Scans markets across the available strategies and manages multiple trade opportunities.",
+                "features": ("Live market scanning", "Multi-trade execution", "Strategy selection"),
+                "access": "Open Bulk Trader in the Bots workspace.",
+            },
+            {
+                "id": "basicBot",
+                "name": "Basic Bot",
+                "tier": "Basic",
+                "summary": "Advanced Differs strategy with multi-window tick analysis.",
+                "features": ("Differs strategy", "Multiple analysis windows", "Risk controls"),
+                "access": "Basic activation required",
+            },
+        ],
     ))
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     response.headers["Pragma"] = "no-cache"
@@ -1777,7 +1871,15 @@ def logout_get():
         rt = user.get("_refreshToken")
         if rt:
             _try_revoke(rt)
+    autonix_user_id = session.get("autonix_user_id")
+    if autonix_user_id:
+        try:
+            set_deriv_connection(autonix_user_id, False)
+        except sqlite3.Error:
+            app.logger.exception("Could not update Autonix Deriv connection status")
     session.clear()
+    if autonix_user_id:
+        session["autonix_user_id"] = autonix_user_id
     resp = make_response(redirect("/"))
     resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     resp.headers["Pragma"] = "no-cache"
@@ -1793,7 +1895,15 @@ def logout():
         rt = user.get("_refreshToken")
         if rt:
             _try_revoke(rt)
+    autonix_user_id = session.get("autonix_user_id")
+    if autonix_user_id:
+        try:
+            set_deriv_connection(autonix_user_id, False)
+        except sqlite3.Error:
+            app.logger.exception("Could not update Autonix Deriv connection status")
     session.clear()
+    if autonix_user_id:
+        session["autonix_user_id"] = autonix_user_id
     resp = jsonify({"success": True, "message": "Logged out"})
     resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     resp.headers["Pragma"] = "no-cache"

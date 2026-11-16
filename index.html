@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" dir="auto" class="light" data-theme="light">
+<html lang="en" dir="auto" class="dark" data-theme="dark">
     <head>
         <!-- Google Tag Manager -->
         <script>
@@ -32,14 +32,7 @@
         <title>Automate Your Trades | Deriv Bot</title>
         <script>
             (function () {
-                var theme = localStorage.getItem('at_theme');
-                if (theme !== 'light' && theme !== 'dark') {
-                    theme = localStorage.getItem('theme');
-                    if (theme === 'light' || theme === 'dark') {
-                        localStorage.setItem('at_theme', theme);
-                    }
-                }
-                theme = theme === 'dark' ? 'dark' : 'light';
+                var theme = 'dark';
                 document.documentElement.setAttribute('data-theme', theme);
                 document.addEventListener('DOMContentLoaded', function () {
                     document.body.classList.remove('theme--light', 'theme--dark');
@@ -54,7 +47,7 @@
         </style>
     </head>
 
-    <body class="body theme theme--light">
+    <body class="body theme theme--dark">
         <!-- Google Tag Manager (noscript) -->
         <noscript
             ><iframe

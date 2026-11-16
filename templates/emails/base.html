@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block email_title %}Autonix{% endblock %}</title>
+  </head>
+  <body style="margin:0;padding:24px;background:#071019;color:#e8f0f5;font-family:Arial,Helvetica,sans-serif;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;margin:0 auto;">
+      <tr>
+        <td style="padding:18px 22px;color:#45efaa;font-size:20px;font-weight:700;letter-spacing:.04em;">AUTONIX</td>
+      </tr>
+      <tr>
+        <td style="padding:26px 22px;border:1px solid #20313f;border-radius:12px;background:#0c1722;font-size:15px;line-height:1.65;">
+          {% block content %}{% endblock %}
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:20px 22px;color:#91a4b4;font-size:12px;line-height:1.6;">
+          <strong style="color:#e8f0f5;">{% block signature %}The Autonix Team{% endblock %}</strong><br>
+          <span style="color:#45efaa;font-style:italic;">Profit driven by intelligence.</span>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

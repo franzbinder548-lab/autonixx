@@ -1,23 +1,17 @@
 import UiStore from '../ui-store';
 
-describe('UiStore theme preference', () => {
+describe('UiStore theme', () => {
     beforeEach(() => {
         localStorage.clear();
     });
 
-    it('defaults to light mode when no preference has been saved', () => {
-        expect(new UiStore().is_dark_mode_on).toBe(false);
+    it('uses dark mode by default', () => {
+        expect(new UiStore().is_dark_mode_on).toBe(true);
     });
 
-    it('prefers the shared theme key over the legacy React key', () => {
+    it('does not allow a saved light preference to override the site theme', () => {
         localStorage.setItem('at_theme', 'light');
-        localStorage.setItem('theme', 'dark');
-
-        expect(new UiStore().is_dark_mode_on).toBe(false);
-    });
-
-    it('honors the legacy React preference when no shared preference exists', () => {
-        localStorage.setItem('theme', 'dark');
+        localStorage.setItem('theme', 'light');
 
         expect(new UiStore().is_dark_mode_on).toBe(true);
     });

@@ -62,10 +62,16 @@
   }
 
   function getStorageKey() {
-    return "autonix-trade-history";
+    return window.AUTONIX_USER_ID
+      ? "autonix-trade-history:" + window.AUTONIX_USER_ID
+      : "autonix-trade-history";
   }
 
   function loadTradeHistory() {
+    if (window.AutonixTradeActivity) {
+      botState.tradeHistory = window.AutonixTradeActivity.load();
+      return;
+    }
     var key = getStorageKey();
     var stored = localStorage.getItem(key);
     if (stored) {
@@ -106,6 +112,19 @@
     setTradeType(botState.tradeType);
     syncInputs();
     updateStartBtnAuthLabel();
+    if ($id("dashboard-reports") && window.renderReports) window.renderReports();
+  });
+
+  window.addEventListener("storage", function (event) {
+    if (event.key !== getStorageKey()) return;
+    loadTradeHistory();
+    if (window.renderReports) window.renderReports();
+  });
+
+  window.addEventListener("autonixTradeActivityUpdated", function () {
+    if (!window.AutonixTradeActivity) return;
+    botState.tradeHistory = window.AutonixTradeActivity.load();
+    if (window.renderReports) window.renderReports();
   });
 
   function updateStartBtnAuthLabel() {
@@ -909,7 +928,7 @@
 
     if (history.length === 0) {
       tbody.innerHTML =
-        '<tr class="reports-empty-row"><td colspan="7">No trades yet — start the bot to begin trading</td></tr>';
+        '<tr class="reports-empty-row"><td colspan="7">No trade history available yet.</td></tr>';
       return;
     }
 

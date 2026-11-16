@@ -1,0 +1,24 @@
+{% extends "emails/base.html" %}
+{% block email_title %}New login to your Autonix account{% endblock %}
+{% block signature %}The Autonix Security Team<br><span style="color:#45efaa;font-style:italic;">This is an automatic security notification. You cannot disable essential account security alerts.</span>{% endblock %}
+{% block content %}
+<p style="margin:0 0 16px;">Hello {{ first_name }},</p>
+<p>A new login to your Autonix account was detected.</p>
+<h2 style="margin:22px 0 8px;color:#45efaa;font-size:17px;">Login details</h2>
+<ul style="padding-left:22px;">
+  <li>Date and time: {{ login_datetime }}</li>
+  <li>Device: {{ device }}</li>
+  <li>Browser: {{ browser }}</li>
+  <li>Approximate location: {{ location }}</li>
+  <li>IP address: {{ ip_address }}</li>
+</ul>
+<p>If this was you, no action is required.</p>
+<h2 style="margin:22px 0 8px;color:#e8f0f5;font-size:17px;">Wasn't this you?</h2>
+<p>We recommend that you immediately:</p>
+<ol style="padding-left:22px;">
+  <li>Change your Autonix password.</li>
+  <li>Review your account security.</li>
+  <li>Contact Autonix support if you notice anything suspicious.</li>
+</ol>
+<p style="margin:24px 0;"><a href="{{ review_url }}" style="display:inline-block;padding:12px 20px;border-radius:6px;background:#45efaa;color:#071019;font-weight:700;text-decoration:none;">REVIEW MY ACCOUNT</a></p>
+{% endblock %}

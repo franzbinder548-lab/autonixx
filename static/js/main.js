@@ -146,6 +146,19 @@
   var currentTickSymbol = null;
   var currentTickUnsubscribe = null;
 
+  function formatAccountBalance(balance, currency) {
+    var amount = Number(balance);
+    if (!Number.isFinite(amount)) return "— " + (currency || "");
+    return (
+      amount.toLocaleString(undefined, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }) +
+      " " +
+      (currency || "USD")
+    );
+  }
+
   function initDerivWS() {
     var sd = window.SESSION_DATA;
     var appId = window.DERIV_APP_ID;
@@ -168,11 +181,14 @@
         account,
         function (bal, cur) {
           var balEl = document.querySelector(".account-balance");
+          var navBalance = document.getElementById("navbar-account-balance");
+          var formattedBalance = formatAccountBalance(bal, cur);
           if (balEl) {
             balEl.textContent = window.AutonixCurrency
               ? window.AutonixCurrency.format(bal)
               : cur + " " + parseFloat(bal).toFixed(2);
           }
+          if (navBalance) navBalance.textContent = formattedBalance;
         },
         wsUrl,
         currency,
@@ -272,8 +288,8 @@
     if (!btn) return;
     btn.addEventListener("click", function () {
       window.showToast &&
-        window.showToast("Connecting to Deriv...", "neutral", 3500);
-      window.location.href = "/auth/login";
+      window.showToast("Opening Autonix sign-in...", "neutral", 3500);
+      window.location.href = "/login";
     });
   }
 
@@ -304,6 +320,15 @@
           if (newActive) {
             sd.activeAccount = newActive;
             /* Update UI: account chip */
+            var navType = document.getElementById("navbar-account-type");
+            if (navType) navType.textContent = newActive.isVirtual ? "D0" : "R0";
+            var navBalance = document.getElementById("navbar-account-balance");
+            if (navBalance) {
+              navBalance.textContent = formatAccountBalance(
+                newActive.balance,
+                newActive.currency,
+              );
+            }
             var chip = document.getElementById("account-chip");
             if (chip) {
               var avatar = chip.querySelector(".account-avatar");
@@ -527,39 +552,19 @@
     });
   }
 
-  /* ── Theme toggle ─────────────────────── */
-  function initThemeToggle() {
+  /* ── Shared dark theme ────────────────── */
+  function enforceDarkTheme() {
     var btn = document.getElementById("rail-theme-btn");
-    if (!btn) return;
-    var html = document.documentElement;
-    var iconDark = btn.querySelector(".theme-icon-dark");
-    var iconLight = btn.querySelector(".theme-icon-light");
-
-    var STORAGE_KEY = "at_theme";
-
-    function applyTheme(theme) {
-      html.setAttribute("data-theme", theme);
-      localStorage.setItem(STORAGE_KEY, theme);
-      document.dispatchEvent(
-        new CustomEvent("themeChanged", { detail: { theme: theme } }),
-      );
-    }
-
-    /* Restore saved preference */
-    var saved = localStorage.getItem(STORAGE_KEY);
-    if (saved && saved !== "dark") applyTheme(saved);
-
-    btn.addEventListener("click", function () {
-      var current = html.getAttribute("data-theme") || "light";
-      applyTheme(current === "dark" ? "light" : "dark");
-    });
+    document.documentElement.setAttribute("data-theme", "dark");
+    document.body.classList.remove("theme--light");
+    document.body.classList.add("theme--dark");
+    if (btn) btn.remove();
   }
 
   /* ── Left rail navigation ──────────────── */
   function initRailNav() {
     var railItems = document.querySelectorAll(".rail-item[data-view]");
     var mainWs = document.getElementById("main-workspace");
-    var reportsPage = document.getElementById("reports-page");
     var posPanel = document.getElementById("positions-panel");
     var tradePanel = document.getElementById("trade-panel");
     var botPanelFab = document.getElementById("bot-panel-fab");
@@ -568,21 +573,6 @@
       item.addEventListener("click", function () {
         var view = item.dataset.view;
 
-        if (view === "reports") {
-          // Show reports, hide main workspace and the Bot Control Panel —
-          // the Report page is dedicated solely to analytics/history.
-          if (mainWs) mainWs.style.display = "none";
-          if (reportsPage) reportsPage.style.display = "";
-          if (tradePanel) tradePanel.style.display = "none";
-          if (botPanelFab) botPanelFab.style.display = "none";
-          railItems.forEach(function (i) {
-            i.classList.remove("active");
-          });
-          item.classList.add("active");
-          if (window.renderReports) window.renderReports();
-          return;
-        }
-
         if (view === "positions") {
           // Toggle positions panel
           if (posPanel) posPanel.classList.toggle("open");
@@ -590,9 +580,8 @@
         }
 
         if (view === "home") {
-          // Show main workspace + Bot Control Panel again, hide reports
+          // Show the trading workspace and Bot Control Panel again.
           if (mainWs) mainWs.style.display = "";
-          if (reportsPage) reportsPage.style.display = "none";
           if (tradePanel) tradePanel.style.display = "";
           if (botPanelFab) botPanelFab.style.display = "";
           railItems.forEach(function (i) {
@@ -618,21 +607,6 @@
       });
     }
 
-    // Reports back button
-    var backBtn = document.getElementById("reports-back-btn");
-    if (backBtn) {
-      backBtn.addEventListener("click", function () {
-        if (mainWs) mainWs.style.display = "";
-        if (tradePanel) tradePanel.style.display = "";
-        if (botPanelFab) botPanelFab.style.display = "";
-        if (reportsPage) reportsPage.style.display = "none";
-        railItems.forEach(function (i) {
-          i.classList.remove("active");
-        });
-        var homeBtn = document.querySelector('.rail-item[data-view="home"]');
-        if (homeBtn) homeBtn.classList.add("active");
-      });
-    }
   }
 
   /* ── Nav search → open markets panel ──── */
@@ -653,59 +627,6 @@
           marketsSearch.dispatchEvent(new Event("input"));
         }
       }
-    });
-  }
-
-  /* ── Mobile drawer navigation ─────────── */
-  function initMobileDrawer() {
-    var rail = document.getElementById("left-rail");
-    var atBtn = document.getElementById("at-logo-btn");
-    var closeBtn = document.getElementById("rail-close-btn");
-    var backdrop = document.getElementById("drawer-backdrop");
-    if (!rail || !atBtn) return;
-
-    function openDrawer() {
-      rail.classList.add("open");
-      if (backdrop) backdrop.classList.add("show");
-      document.body.classList.add("drawer-open");
-    }
-    function closeDrawer() {
-      rail.classList.remove("open");
-      if (backdrop) backdrop.classList.remove("show");
-      document.body.classList.remove("drawer-open");
-    }
-    function toggleDrawer() {
-      if (rail.classList.contains("open")) closeDrawer();
-      else openDrawer();
-    }
-
-    atBtn.addEventListener("click", function (e) {
-      e.preventDefault();
-      e.stopPropagation();
-      toggleDrawer();
-    });
-
-    if (closeBtn) closeBtn.addEventListener("click", closeDrawer);
-    if (backdrop) backdrop.addEventListener("click", closeDrawer);
-
-    /* Close drawer when tapping a nav item */
-    rail.querySelectorAll(".rail-item[data-view]").forEach(function (item) {
-      item.addEventListener("click", closeDrawer);
-    });
-
-    /* Close drawer when clicking nav links */
-    rail.querySelectorAll("a.rail-item").forEach(function (link) {
-      link.addEventListener("click", closeDrawer);
-    });
-
-    /* Escape key closes */
-    document.addEventListener("keydown", function (e) {
-      if (e.key === "Escape") closeDrawer();
-    });
-
-    /* Close on resize to desktop */
-    window.addEventListener("resize", function () {
-      if (window.innerWidth >= 768) closeDrawer();
     });
   }
 
@@ -817,7 +738,7 @@
   /* ── Init ─────────────────────────────── */
   document.addEventListener("DOMContentLoaded", function () {
     handleDerivCallback();
-    initThemeToggle();
+    enforceDarkTheme();
     initDerivWS();
     initLogin();
     initLegacyLinkBanner();
@@ -825,7 +746,6 @@
     initRailAccount();
     initRailNav();
     initNavSearch();
-    initMobileDrawer();
     initMobileBotPanel();
   });
 })();

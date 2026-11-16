@@ -5,7 +5,7 @@
 {% block meta_description %}Your Autonix trading dashboard — manage accounts, view balances, and access all trading tools.{% endblock %}
 
 {% block body %}
-<div class="app-wrapper">
+<div class="app-wrapper dashboard-app">
   {% include "partials/top_nav.html" %}
   <div class="drawer-backdrop" id="drawer-backdrop" aria-hidden="true"></div>
 
@@ -14,13 +14,16 @@
 
     <main class="dash-workspace" id="dash-workspace" aria-label="Dashboard">
 
-      {% if session_data and session_data.isAuthenticated %}
+      {% if autonix_user %}
+      {% include "partials/dashboard_overview.html" %}
+
+      {% if deriv_connected and session_data and session_data.isAuthenticated %}
 
       <!-- Header bar -->
       <div class="dash-topbar">
         <div class="dash-topbar-left">
-          <h1 class="dash-title">Dashboard</h1>
-          <p class="dash-subtitle">Welcome back &mdash; <strong>{{ session_data.activeAccount.account }}</strong></p>
+          <h2 class="dash-title">Trading workspace</h2>
+          <p class="dash-subtitle">Live tools for your connected Deriv account.</p>
           <div class="dash-identity-row">
             <span class="dash-environment-badge {% if session_data.activeAccount.isVirtual %}is-demo{% else %}is-real{% endif %}">
               {{ 'DEMO' if session_data.activeAccount.isVirtual else 'LIVE / REAL' }}
@@ -39,6 +42,10 @@
           </div>
         </div>
       </div>
+
+      {% if session.get("autonix_deriv_link_error") %}
+      <p class="dash-section-note" role="alert">{{ session.get("autonix_deriv_link_error") }}</p>
+      {% endif %}
 
       <!-- Balance card -->
       <section class="dash-section" aria-labelledby="dash-balance-heading">
@@ -66,7 +73,7 @@
         </div>
       </section>
 
-      <section class="dash-section" aria-labelledby="dash-accounts-heading">
+      <section class="dash-section" id="dashboard-accounts" aria-labelledby="dash-accounts-heading">
         <h2 class="dash-section-title" id="dash-accounts-heading">Your Accounts</h2>
         <div class="dash-accounts-grid" role="list">
           {% for acc in session_data.accounts %}
@@ -78,18 +85,6 @@
           {% endfor %}
         </div>
       </section>
-
-      <section class="dash-section dash-surface dash-live-chart-section" aria-labelledby="dash-chart-heading">
-        <div class="dash-section-heading-row"><div><h2 class="dash-section-title" id="dash-chart-heading">Live market chart</h2><p class="dash-section-note"><span class="dash-chart-live-dot"></span> LIVE &middot; Volatility 100 (1s)</p></div><a class="dash-inline-link" href="/trader">Open Trader &rarr;</a></div>
-        <div class="dash-chart-toolbar"><strong id="dash-chart-symbol">Volatility 100 (1s)</strong><span id="dash-chart-price">Connecting&hellip;</span></div>
-        <canvas id="dash-live-chart" aria-label="Live Volatility 100 (1s) price chart"></canvas>
-        <div class="dash-chart-status" id="dash-chart-status">Connecting to Deriv market data&hellip;</div>
-      </section>
-
-      <div class="dash-command-grid">
-        <section class="dash-section dash-surface" aria-labelledby="dash-active-heading"><div class="dash-section-heading-row"><div><h2 class="dash-section-title" id="dash-active-heading">Active trades</h2><p class="dash-section-note">Open positions require the live Trader view.</p></div><a class="dash-inline-link" href="/trader">View all &rarr;</a></div><div class="dash-empty-state"><strong>No active trades</strong><span>Start a trade to see its symbol, stake, status, and account here.</span><a class="nav-btn nav-btn-filled" href="/trader">Start Trading</a></div></section>
-        <section class="dash-section dash-surface" aria-labelledby="dash-automation-heading"><div class="dash-section-heading-row"><div><h2 class="dash-section-title" id="dash-automation-heading">Automation</h2><p class="dash-section-note">Bot status is managed in the Bots workspace.</p></div><a class="dash-inline-link" href="/bots">Manage bots &rarr;</a></div><div class="dash-empty-state"><strong>No bot status available</strong><span>Open Bots to view and manage your saved strategies.</span><a class="nav-btn nav-btn-quiet" href="/bots">Open Bots</a></div></section>
-      </div>
 
       <section class="dash-section dash-finance-section" aria-labelledby="dash-finance-heading">
         <div class="dash-section-heading-row">
@@ -107,85 +102,16 @@
         </div>
       </section>
 
-      <!-- Quick access nav -->
-      <section class="dash-section" aria-labelledby="dash-quicknav-heading">
-        <h2 class="dash-section-title" id="dash-quicknav-heading">Quick Access</h2>
-        <div class="dash-nav-grid" role="list">
-
-          <a href="/trader" class="dash-nav-tile" role="listitem">
-            <div class="dash-nav-icon" style="--tile-color:#00E5A0;--tile-bg:rgba(0,229,160,.12)" aria-hidden="true">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
-            </div>
-            <div class="dash-nav-label">Trader</div>
-            <div class="dash-nav-desc">Live charts &amp; one-click trading</div>
-            <svg class="dash-nav-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
-          </a>
-
-          <a href="/bots" class="dash-nav-tile" role="listitem">
-            <div class="dash-nav-icon" style="--tile-color:#5b9dff;--tile-bg:rgba(91,157,255,.12)" aria-hidden="true">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
-            </div>
-            <div class="dash-nav-label">Bots</div>
-            <div class="dash-nav-desc">Automated AI trading bots</div>
-            <svg class="dash-nav-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
-          </a>
-
-          <a href="/atdbot" class="dash-nav-tile" role="listitem">
-            <div class="dash-nav-icon" style="--tile-color:#8B5CF6;--tile-bg:rgba(139,92,246,.12)" aria-hidden="true">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
-            </div>
-            <div class="dash-nav-label">ATDBot</div>
-            <div class="dash-nav-desc">Visual strategy builder</div>
-            <svg class="dash-nav-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
-          </a>
-
-          <a href="/invest" class="dash-nav-tile" role="listitem">
-            <div class="dash-nav-icon" style="--tile-color:#F59E0B;--tile-bg:rgba(245,158,11,.12)" aria-hidden="true">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-            </div>
-            <div class="dash-nav-label">Invest</div>
-            <div class="dash-nav-desc">Managed investment plans</div>
-            <svg class="dash-nav-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
-          </a>
-
-          <a href="/journal" class="dash-nav-tile" role="listitem">
-            <div class="dash-nav-icon" style="--tile-color:#ef4444;--tile-bg:rgba(239,68,68,.12)" aria-hidden="true">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
-            </div>
-            <div class="dash-nav-label">Journal</div>
-            <div class="dash-nav-desc">Discipline &amp; trade logs</div>
-            <svg class="dash-nav-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
-          </a>
-
-          <a href="/trader" class="dash-nav-tile" role="listitem">
-            <div class="dash-nav-icon" style="--tile-color:#10b981;--tile-bg:rgba(16,185,129,.12)" aria-hidden="true">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-            </div>
-            <div class="dash-nav-label">Reports</div>
-            <div class="dash-nav-desc">Analytics &amp; trade history</div>
-            <svg class="dash-nav-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
-          </a>
-
-        </div>
-      </section>
-
+      {% endif %}
       {% else %}
-
-      <!-- Not authenticated -->
       <div class="dash-unauth">
         <div class="dash-unauth-card">
-          <div class="dash-unauth-icon" aria-hidden="true">
-            <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-          </div>
-          <h2>Sign in to access your dashboard</h2>
-          <p>Connect your Deriv account to view your balance, switch between accounts, and access all Autonix trading tools.</p>
-          <a href="/auth/login" class="nav-btn nav-btn-filled" style="display:inline-flex;gap:8px;margin-top:8px;">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
-            Log in with Deriv
-          </a>
+          <h2>Sign in to your Autonix account</h2>
+          <p>Your website account is separate from your Deriv trading authorization.</p>
+          <a href="/login" class="nav-btn nav-btn-filled">Log in</a>
+          <a href="/register" class="nav-btn nav-btn-quiet">Create an account</a>
         </div>
       </div>
-
       {% endif %}
 
     </main>
@@ -288,7 +214,7 @@ document.addEventListener("derivBalance", function (e) {
     submit.disabled = true; submit.textContent = "Transferring…";
     fetch("/dashboard/api/transfers", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ source_id: sourceSelect.value, destination_id: destinationSelect.value, amount: amountInput.value, description: document.getElementById("transfer-description").value }) }).then(function (response) { return response.json().then(function (data) { if (!response.ok) throw new Error(data.error || "Transfer failed."); return data; }); }).then(function (data) { showFeedback("Transfer completed: " + data.amount + " " + data.currency + ". Balances are being refreshed.", true); breakdown.hidden = true; validation = null; busy = false; submit.type = "submit"; submit.disabled = false; submit.textContent = "Validate transfer"; amountInput.value = ""; loadFinance(); }).catch(function (error) { showFeedback(error.message, false); busy = false; submit.disabled = false; submit.textContent = "Validate transfer"; validation = null; submit.type = "submit"; });
   }
-  function loadFinance() { fetch("/dashboard/api/transfers/options", { credentials: "same-origin" }).then(function (response) { return response.json(); }).then(function (data) { var grid = document.getElementById("dash-finance-grid"); grid.innerHTML = (data.sources || []).map(function (item) { return '<div class="dash-finance-card"><div class="dash-finance-card-top"><span>' + (item.kind === "wallet" ? "Wallet" : "Trading account") + '</span><b>' + item.currency + '</b></div><strong>' + Number(item.balance || 0).toFixed(2) + '</strong><small>' + item.label + '</small></div>'; }).join("") || '<div class="dash-finance-placeholder">No eligible accounts found.</div>'; }).catch(function () { document.getElementById("dash-finance-grid").innerHTML = '<div class="dash-finance-placeholder">Wallet balances are temporarily unavailable.</div>'; }); }
+  function loadFinance() { var grid = document.getElementById("dash-finance-grid"); if (!grid) return; fetch("/dashboard/api/transfers/options", { credentials: "same-origin" }).then(function (response) { return response.json(); }).then(function (data) { grid.innerHTML = (data.sources || []).map(function (item) { return '<div class="dash-finance-card"><div class="dash-finance-card-top"><span>' + (item.kind === "wallet" ? "Wallet" : "Trading account") + '</span><b>' + item.currency + '</b></div><strong>' + Number(item.balance || 0).toFixed(2) + '</strong><small>' + item.label + '</small></div>'; }).join("") || '<div class="dash-finance-placeholder">No eligible accounts found.</div>'; }).catch(function () { grid.innerHTML = '<div class="dash-finance-placeholder">Wallet balances are temporarily unavailable.</div>'; }); }
   function initLiveChart() {
     var canvas = document.getElementById("dash-live-chart");
     var status = document.getElementById("dash-chart-status");
@@ -331,6 +257,12 @@ document.addEventListener("derivBalance", function (e) {
     fetch("/dashboard/api/live-chart", { credentials: "same-origin" }).then(function (response) { return response.json().then(function (data) { if (!response.ok) throw new Error(data.error || "Market unavailable"); return data; }); }).then(function (config) { chartConfig = config; connect(); }).catch(function (error) { status.textContent = error.message; price.textContent = "—"; });
     window.addEventListener("resize", draw);
   }
+  document.querySelectorAll("time[data-dashboard-time]").forEach(function (element) {
+    var timestamp = new Date(element.dateTime);
+    if (!Number.isNaN(timestamp.getTime())) {
+      element.textContent = timestamp.toLocaleString();
+    }
+  });
   loadFinance();
   initLiveChart();
 })();

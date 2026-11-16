@@ -1,0 +1,24 @@
+{% extends "emails/base.txt" %}
+{% block signature %}The Autonix Security Team
+
+This is an automatic security notification. You cannot disable essential account security alerts.{% endblock %}
+{% block content %}Hello {{ first_name }},
+
+A new login to your Autonix account was detected.
+
+LOGIN DETAILS
+- Date and time: {{ login_datetime }}
+- Device: {{ device }}
+- Browser: {{ browser }}
+- Approximate location: {{ location }}
+- IP address: {{ ip_address }}
+
+If this was you, no action is required.
+
+WASN'T THIS YOU?
+We recommend that you immediately:
+1. Change your Autonix password.
+2. Review your account security.
+3. Contact Autonix support if you notice anything suspicious.
+
+REVIEW MY ACCOUNT: {{ review_url }}{% endblock %}

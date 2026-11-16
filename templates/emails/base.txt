@@ -1,0 +1,7 @@
+AUTONIX
+
+{% block content %}{% endblock %}
+
+{% block signature %}The Autonix Team
+
+Profit driven by intelligence.{% endblock %}

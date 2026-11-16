@@ -1,132 +1,85 @@
-# Flask Authentication System - Testing & Debugging Guide
+# Autonix and Deriv Authentication - Testing & Debugging Guide
 
 ## Overview
 
-The Flask app now has a complete authentication system using Deriv OAuth 2.0 + PKCE. After login, users are **always redirected to `/dashboard`**.
+Autonix website identity and Deriv trading authorization are separate systems.
+Autonix users are stored in `data/autonix_users.sqlite3`; Deriv OAuth 2.0 + PKCE
+continues to own trading authorization and its existing token session.
 
-## Flask Auth Flow
+## Autonix Account Flow
 
 ```
-1. User clicks "Login" on the Flask app
+1. Visitor registers with email/password or Google at /register
    ↓
-2. Redirects to /auth/login
+2. Autonix stores the website identity and starts an Autonix session
    ↓
-3. Flask generates PKCE challenge + state and redirects to Deriv OAuth
+3. Autonix redirects to the protected /dashboard
    ↓
-4. User authenticates with Deriv
+4. User can access their profile without a Deriv account
    ↓
-5. Deriv redirects back to / with ?code parameter
+5. Connect Deriv Account invokes the existing /auth/login flow
    ↓
-6. Flask processes callback in _handle_oauth_callback():
-   - Verifies PKCE state
-   - Exchanges code for access_token
-   - Fetches user accounts
-   - Creates Flask session
-   ↓
-7. Flask redirects to /dashboard
-   ↓
-8. User sees Dashboard with authenticated session
+6. After a successful Deriv account session, verified account IDs are linked
+   to the current Autonix user in the separate Autonix database
 ```
 
-## Key Flask Routes
+Deriv token exchange, account selection, token storage, WebSocket authorization,
+and trading remain in the existing Deriv implementation. Autonix logout clears
+website identity only; Deriv logout revokes and clears Deriv state while retaining
+an active Autonix session.
 
-### `/auth/login`
-- **What it does:** Initiates OAuth flow with Deriv
-- **Redirects to:** Deriv OAuth URL (auth.deriv.com)
-- **PKCE:** Enabled (verifier in signed state)
+## Key Routes
 
-### `/` (Home / OAuth Callback Target)
-- **What it does:** Serves marketing page OR processes OAuth callback
-- **How it decides:**
-  - If `?code=...` in URL → call `_handle_oauth_callback()`
-  - If `?acct1=...` in URL → call `_handle_legacy_callback()`
-  - Otherwise → serve `autonix.html` (marketing page)
+- `/register`, `/login`: Autonix email/password authentication.
+- `/auth/google`, `/auth/google/callback`: Autonix Google OAuth.
+- `/password/forgot`, `/password/reset/<token>`: Autonix password recovery.
+- `/account/profile`, `/account/logout`: Autonix profile and website logout.
+- `/dashboard`: Requires an active Autonix account; Deriv is optional.
+- `/auth/login`: Existing Deriv OAuth entry point; PKCE and fallback behavior are retained.
+- `/auth/logout`: Revokes and clears Deriv state while preserving Autonix identity.
 
-### `/_handle_oauth_callback()` (Called by `/`)
-- **What it does:**
-  1. Verifies PKCE state
-  2. Exchanges auth code for tokens
-  3. Fetches user accounts
-  4. Creates Flask session with `_build_accounts_session()`
-  5. **Redirects to `/dashboard`**
+## Environment Configuration
 
-### `/dashboard`
-- **What it does:** Serves Dashboard template
-- **Session check:** Shows dashboard only if `session_data.isAuthenticated == True`
-- **Fallback:** Shows login prompt if not authenticated
-
-### `/auth/logout`
-- **What it does:**
-  1. Revokes access_token and refresh_token
-  2. Clears Flask session
-  3. Redirects to `/` (marketing page)
-
-## Testing the Flask Auth
-
-### Step 1: Check Environment Variables
-
-Make sure these are set in `.env` or `.env.production`:
+The app loads `.env.production` before `.env`. Keep real values there and out of
+source control. `.env.example` contains placeholders only.
 
 ```bash
-# Required
-DERIV_APP_ID=your_oauth_client_id_here
-REDIRECT_URL=http://localhost:5000  # Must match registered URI in Deriv
+# Existing Deriv OAuth setup (unchanged)
+DERIV_APP_ID=your_deriv_oauth_client_id
+REDIRECT_URL=https://your-domain.example
+SESSION_SECRET=your_long_random_session_secret
+DERIV_LEGACY_APP_ID=your_numeric_legacy_app_id
 
-# Optional but recommended
-SESSION_SECRET=your_secret_key_here
-DERIV_LEGACY_APP_ID=your_numeric_app_id  # For fallback to legacy flow
+# Brevo SMTP (TLS on port 587 is recommended)
+SMTP_HOST=smtp-relay.brevo.com
+SMTP_PORT=587
+SMTP_USERNAME=your-brevo-smtp-login
+SMTP_PASSWORD=your-brevo-smtp-key
+SMTP_ENCRYPTION=tls
+MAIL_FROM_NAME=Autonix
+MAIL_FROM_ADDRESS=your-verified-sender-address
+
+# Google OAuth web client
+AUTONIX_GOOGLE_CLIENT_ID=your-google-oauth-client-id
+AUTONIX_GOOGLE_CLIENT_SECRET=your-google-oauth-client-secret
+AUTONIX_GOOGLE_REDIRECT_URI=https://your-domain.example/auth/google/callback
+AUTONIX_PUBLIC_URL=https://your-domain.example
 ```
 
-### Step 2: Start Flask App
+The Google callback URL must exactly match the URI registered in Google Cloud.
+Brevo requires valid SMTP credentials and a verified sender address. Missing SMTP
+settings are reported by variable name; SMTP errors are logged and surfaced as
+delivery failures, not simulated success. Optionally set `AUTONIX_PUBLIC_URL` to
+the canonical site origin for reset links; otherwise the existing `REDIRECT_URL`
+is used.
+
+## Testing the Flask App
+
+Start Flask with the normal project command:
 
 ```bash
 python app.py
 ```
-
-You should see:
-```
- * Running on http://0.0.0.0:5000
- * Debug mode: on/off
- [INFO] [OAuth] Session created successfully
-```
-
-### Step 3: Test Login Flow
-
-**In Browser:**
-
-1. Go to `http://localhost:5000/`
-   - Should see marketing page (autonix.html)
-
-2. Click "Join Deriv for Free" or use login button
-   - Should redirect to `auth.deriv.com`
-   - Deriv login screen appears
-
-3. Log in with Deriv test account (or create one)
-   - Deriv asks for permission
-   - Should redirect back to your app with `?code=...`
-
-4. Flask processes callback
-   - Check browser console/network tab
-   - Should see redirect to `http://localhost:5000/dashboard`
-
-5. Dashboard should load with:
-   - Account info showing (e.g., "Welcome back — VRT...")
-   - Live connection indicator
-   - Balance displayed
-
-**Expected in Flask logs:**
-
-```
-[INFO] [OAuth] Processing callback...
-[INFO] [OAuth] Received code: xxx...
-[INFO] [OAuth] PKCE verifier recovered from signed state
-[INFO] [OAuth] Token exchange successful
-[INFO] [OAuth] Built 1 account(s)
-[INFO] [OAuth] Session created successfully
-[INFO] [OAuth] Redirecting to /dashboard after successful login
-```
-
-### Step 4: Verify Session with Debug Endpoints
 
 #### Check Session Status
 
@@ -161,27 +114,21 @@ Expected response (after login):
 }
 ```
 
-### Step 5: Test Logout
+### Test Autonix and Deriv Separately
 
-1. In Dashboard, click "Logout"
-   - Should redirect to `/` (marketing page)
-
-2. Verify session is cleared:
-   ```bash
-   curl http://localhost:5000/api/auth-debug
-   ```
-   
-   Expected response:
-   ```json
-   {
-     "session_exists": false,
-     "is_authenticated": false,
-     "session_keys": []
-   }
-   ```
-
-3. Try to access `/dashboard` directly
-   - Should show login prompt (not dashboard content)
+1. Visit `/register` and create an Autonix account without signing in to Deriv.
+2. Verify `/dashboard` shows the Autonix profile and Deriv connection options.
+3. Verify `/account/profile` returns the Autonix profile and an unconnected state.
+4. Choose **Connect Deriv Account** and complete the existing Deriv OAuth flow.
+5. Verify the dashboard shows the existing Deriv account information and
+   `/account/profile` lists its account ID.
+6. Submit a password reset for an email-backed account. Verify a real email is
+   accepted by Brevo and received; SMTP or sender-verification failures must be
+   treated as delivery failures.
+7. Autonix logout should end website identity. Deriv logout should revoke/clear
+   Deriv session state while keeping an Autonix session active.
+8. A visitor without an Autonix session should be redirected from `/dashboard`
+   to `/login`.
 
 ## Common Issues & Fixes
 
@@ -344,27 +291,26 @@ When user is logged in, Flask session contains:
 
 - [ ] Flask app starts without errors
 - [ ] Marketing page loads at `/`
-- [ ] Login button exists and clickable
-- [ ] Clicking login redirects to Deriv
-- [ ] Can log in with Deriv account
-- [ ] After login, redirects to `/dashboard`
-- [ ] Dashboard shows account info
+- [ ] Autonix registration/login works without a Deriv account
+- [ ] `/dashboard` redirects unauthenticated visitors to `/login`
+- [ ] An Autonix-only user sees the profile and Deriv connection options
+- [ ] Password reset sends a real Brevo email from a verified sender
+- [ ] Google OAuth creates or signs into an Autonix account
+- [ ] Connect Deriv invokes the unchanged Deriv authorization flow
+- [ ] A successful Deriv account session is associated with its Autonix user
+- [ ] The existing connected Deriv dashboard and account switching still work
 - [ ] `/api/auth-debug` shows `is_authenticated: true`
-- [ ] Logout button appears on dashboard
-- [ ] Clicking logout clears session
-- [ ] After logout, session is gone
-- [ ] Can log in again (session cleared properly)
-- [ ] Reloading dashboard while logged in keeps session
-- [ ] Accessing `/dashboard` without login shows login prompt
+- [ ] Deriv logout leaves the Autonix website session active
+- [ ] SMTP delivery failures are reported instead of simulated as success
 
 ## Next Steps: React Integration
 
-Once Flask auth is working:
+The React trading-bot app continues to use Flask's Deriv endpoints for trading
+authorization:
 
 1. React needs to check Flask's `/auth/session` endpoint
-2. React calls Flask's `/auth/login` for login (not its own OAuth)
-3. React calls Flask's `/auth/logout` for logout
-4. React displays Dashboard based on Flask session
+2. React calls Flask's `/auth/login` when a Deriv connection is needed
+3. React calls Flask's `/auth/logout` to disconnect Deriv
 
 See `UNIFIED_AUTHENTICATION.md` for React integration guide.
 

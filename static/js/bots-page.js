@@ -2372,6 +2372,15 @@
   function pushGlobalHistory(entry) {
     globalHistory.unshift(entry);
     if (globalHistory.length > 500) globalHistory.length = 500;
+    if (window.AutonixTradeActivity) {
+      window.AutonixTradeActivity.record({
+        type: entry.botName,
+        selection: entry.tradeType,
+        stake: entry.stake,
+        pl: entry.pl,
+        time: entry.time,
+      });
+    }
     renderHistoryCard();
   }
   function renderHistoryCard() {

@@ -16,13 +16,9 @@
     running:          false,
     symbol:           "1HZ100V",
     stake:            10,
-    numTrades:        10,
-    takeProfit:       5,
-    stopLoss:         100,
+    numTrades:        5,
     duration:         1,
-    martingale:       1,
-    currentStake:     10,
-    strategyMode:     "both",   // "differs" | "overunder" | "both"
+    strategyMode:     "differs",   // "differs" | "overunder" | "both"
 
     trades:           [],       // array of trade objects (pushed as submitted)
     totalPL:          0,
@@ -263,23 +259,23 @@
     bt.totalPL = +(bt.totalPL + trade.pl).toFixed(2);
     if (result.won) {
       bt.wins++;
-      bt.currentStake = bt.stake;
     } else {
       bt.losses++;
-      bt.currentStake = Math.min(+(trade.stake * bt.martingale).toFixed(2), 5000);
+    }
+    if (window.AutonixTradeActivity) {
+      window.AutonixTradeActivity.record({
+        type: trade.strategy,
+        selection: trade.signal,
+        entry: trade.entryDigit,
+        exit: trade.exitDigit,
+        stake: trade.stake,
+        pl: trade.pl,
+        time: trade.time,
+      });
     }
     renderTable();
     renderLiveSummary();
     updateGlobalSummary();
-    if (bt.running && bt.totalPL >= bt.takeProfit) {
-      stop("tp");
-      return;
-    }
-    if (bt.running && bt.stopLoss > 0 &&
-        (bt.totalPL <= -bt.stopLoss || bt.currentStake > bt.stopLoss + bt.totalPL)) {
-      stop("sl");
-      return;
-    }
     checkBatchComplete();
     if (bt.running && bt.submittedCount < bt.numTrades) {
       bt.executionActive = false;
@@ -341,11 +337,6 @@
   function processNext() {
     if (!bt.running) { bt.executionActive = false; return; }
     if (bt.submittedCount >= bt.numTrades) { bt.executionActive = false; return; }
-    if (bt.totalPL >= bt.takeProfit) { stop("tp"); return; }
-    if (bt.stopLoss > 0 && (bt.totalPL <= -bt.stopLoss || bt.currentStake > bt.stopLoss + bt.totalPL)) {
-      stop("sl");
-      return;
-    }
 
     var sig = bt.currentSignal;
     if (!sig) {
@@ -371,7 +362,7 @@
       selection: sig.selection,
       digit:     sig.digit,
       tradeType: sig.tradeType,
-      stake: Math.min(+(bt.currentStake).toFixed(2), 5000),
+      stake: Math.min(+(bt.stake).toFixed(2), 5000),
       status: "pending", result: null, pl: 0,
       entryDigit: "-", exitDigit: "-", time: "-", contractId: null,
     };
@@ -720,18 +711,11 @@
 
     bt.symbol       = (symbolEl    && symbolEl.value)    || "1HZ100V";
     bt.stake        = Math.max(0.35, parseFloat((stakeEl && stakeEl.value) || "10") || 10);
-    var takeProfitEl = $id("bulk-take-profit");
-    bt.takeProfit    = Math.max(0.01, parseFloat((takeProfitEl && takeProfitEl.value) || "5") || 5);
-    var stopLossEl = $id("bulk-stop-loss");
-    bt.stopLoss = Math.max(0, parseFloat((stopLossEl && stopLossEl.value) || "100") || 0);
     var durationEl = $id("bulk-duration");
     bt.duration = Math.max(1, parseInt((durationEl && durationEl.value) || "1", 10) || 1);
-    var martingaleEl = $id("bulk-martingale");
-    bt.martingale = Math.min(10, Math.max(1, parseFloat((martingaleEl && martingaleEl.value) || "1") || 1));
-    bt.currentStake = bt.stake;
     bt.numTrades    = Math.max(1, Math.min(500,
-      parseInt((numTradesEl && numTradesEl.value) || "10", 10) || 10));
-    bt.strategyMode = (stratEl && stratEl.value) || "both";
+      parseInt((numTradesEl && numTradesEl.value) || "5", 10) || 5));
+    bt.strategyMode = (stratEl && stratEl.value) || "differs";
 
     if (!window.DerivWS || !window.DerivWS.isAuthorized()) {
       window.showToast && window.showToast(
@@ -817,14 +801,10 @@
     var settled = bt.settledCount;
     var total   = bt.submittedCount;
     setStatus("stopped",
-      reason === "tp" ? "Take Profit reached" : reason === "sl" ? "Stop Loss reached" :
-        total ? "Stopped — " + settled + " / " + total + " settled" : "Stopped");
+      total ? "Stopped — " + settled + " / " + total + " settled" : "Stopped");
     updateBtn();
     renderLiveSummary();
     updateGlobalSummary();
-    if (reason === "tp" && window.showTPCelebration) {
-      window.showTPCelebration(bt.totalPL);
-    }
   }
 
   /* ─── Populate symbol selector ────────────────────────────────── */

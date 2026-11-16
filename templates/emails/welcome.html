@@ -1,0 +1,24 @@
+{% extends "emails/base.html" %}
+{% block email_title %}Welcome to Autonix{% endblock %}
+{% block content %}
+<p style="margin:0 0 16px;">Hello {{ first_name }},</p>
+<p>Welcome to <strong>Autonix</strong>.</p>
+<p>Your account has been successfully created, and you're now part of an intelligent trading technology platform built to make automated trading more accessible.</p>
+<h2 style="margin:24px 0 8px;color:#45efaa;font-size:18px;">Your account is ready</h2>
+<p>You can now:</p>
+<ul style="padding-left:22px;">
+  <li>Access your personal Autonix dashboard.</li>
+  <li>Explore available AI trading bots.</li>
+  <li>Manage your account and security settings.</li>
+  <li>Connect your Deriv account to unlock trading features.</li>
+</ul>
+<p><strong>Your next step:</strong> Connect your Deriv account whenever you're ready to start using Autonix trading features.</p>
+<p style="margin:24px 0;"><a href="{{ dashboard_url }}" style="display:inline-block;padding:12px 20px;border-radius:6px;background:#45efaa;color:#071019;font-weight:700;text-decoration:none;">OPEN MY DASHBOARD</a></p>
+<p><strong>Your account details:</strong></p>
+<ul style="padding-left:22px;">
+  <li>Name: {{ full_name }}</li>
+  <li>Email: {{ email }}</li>
+  <li>Registration date: {{ registration_date }}</li>
+</ul>
+<p>We're glad to have you with us.</p>
+{% endblock %}

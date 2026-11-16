@@ -929,7 +929,7 @@ body.drawer-open {
   align-items: center;
   gap: 12px;
   padding: 8px 14px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid #000000;
   background: var(--bg);
   flex-shrink: 0;
 }
@@ -1266,7 +1266,7 @@ body.drawer-open {
   gap: 12px;
   padding: 0 12px;
   height: 40px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid #000000;
   background: var(--bg);
   flex-shrink: 0;
 }
@@ -1317,7 +1317,7 @@ body.drawer-open {
   justify-content: space-between;
   padding: 0 8px;
   height: 36px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid #000000;
   background: var(--bg);
   flex-shrink: 0;
   gap: 8px;

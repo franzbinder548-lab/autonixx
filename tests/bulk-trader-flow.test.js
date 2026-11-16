@@ -8,10 +8,7 @@ describe('Bulk Trader execution flow', () => {
         <select id="bulk-strategy"><option value="differs" selected>Differs</option></select>
         <input id="bulk-stake" value="10" />
         <input id="bulk-num-trades" value="2" />
-        <input id="bulk-take-profit" value="100" />
-        <input id="bulk-stop-loss" value="100" />
         <select id="bulk-duration"><option value="5" selected>5 ticks</option></select>
-        <input id="bulk-martingale" value="2" />
         <button id="bulk-execute-btn"></button><button id="bulk-stop-btn"></button>
         <div id="bulk-status-pill"></div><div id="bulk-analysis-summary"></div>
         <div id="bulk-live-summary"></div><div id="bulk-history-wrap"></div>
@@ -25,7 +22,7 @@ describe('Bulk Trader execution flow', () => {
     delete window.AutonixBulkTrader;
   });
 
-  it('submits one trade, then waits for a fresh tick before using the next stake', async () => {
+  it('submits at a fixed stake and waits for a fresh tick before the next trade', async () => {
     const ticks = Array.from({ length: 100 }, (_, index) => ({
       price: 100 + (index % 10) / 100,
       time: index * 1000,
@@ -67,7 +64,7 @@ describe('Bulk Trader execution flow', () => {
     expect(buyContract.mock.calls[1][0]).toEqual(expect.objectContaining({
       tradeType: 'match-differ',
       duration: 5,
-      stake: 20,
+      stake: 10,
     }));
     expect(document.getElementById('bulk-history-tbody').textContent).toContain('In Trade');
   }, 20000);

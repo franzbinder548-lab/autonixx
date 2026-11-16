@@ -1,0 +1,12 @@
+{% extends "emails/base.txt" %}
+{% block content %}Hello {{ first_name }},
+
+Thank you for creating an Autonix account.
+
+To secure your account and confirm that this email address belongs to you, verify your email address here:
+
+VERIFY MY EMAIL: {{ verification_url }}
+
+This verification link expires in {{ expiry_time }}.
+
+If you did not create an Autonix account, you can safely ignore this email.{% endblock %}

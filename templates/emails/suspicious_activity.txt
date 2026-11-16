@@ -1,0 +1,25 @@
+{% extends "emails/base.txt" %}
+{% block signature %}The Autonix Security Team
+
+We take your account security seriously.{% endblock %}
+{% block content %}Hello {{ first_name }},
+
+We detected activity on your Autonix account that may require your attention.
+
+ACTIVITY DETAILS
+- Activity detected: {{ activity_type }}
+- Date and time: {{ activity_datetime }}
+- Device: {{ device }}
+- Browser: {{ browser }}
+- Approximate location: {{ location }}
+- IP address: {{ ip_address }}
+
+RECOMMENDED ACTION
+If you do not recognize this activity:
+1. Change your password immediately.
+2. Review your recent account activity.
+3. Contact Autonix support if you believe your account has been compromised.
+
+SECURE MY ACCOUNT: {{ secure_url }}
+
+If you recognize this activity, you can disregard this notification.{% endblock %}

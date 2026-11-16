@@ -1,14 +1,9 @@
 import { action, makeObservable, observable } from 'mobx';
 import { isTouchDevice } from '@/components/shared/utils/screen/responsive';
 
-/** An explicit saved preference wins; new installs start in light mode. */
+/** The Autonix workspace uses a consistent dark theme. */
 function getInitialDarkMode(): boolean {
-    const sharedTheme = localStorage.getItem('at_theme');
-    const stored =
-        sharedTheme === 'dark' || sharedTheme === 'light' ? sharedTheme : localStorage.getItem('theme');
-    if (stored === 'dark') return true;
-    if (stored === 'light') return false;
-    return false;
+    return true;
 }
 
 export default class UiStore {

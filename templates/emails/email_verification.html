@@ -1,0 +1,12 @@
+{% extends "emails/base.html" %}
+{% block email_title %}Verify your Autonix email{% endblock %}
+{% block content %}
+<p style="margin:0 0 16px;">Hello {{ first_name }},</p>
+<p>Thank you for creating an Autonix account.</p>
+<p>To secure your account and confirm that this email address belongs to you, please verify your email address using the button below.</p>
+<p style="margin:24px 0;"><a href="{{ verification_url }}" style="display:inline-block;padding:12px 20px;border-radius:6px;background:#45efaa;color:#071019;font-weight:700;text-decoration:none;">VERIFY MY EMAIL</a></p>
+<p>This verification link expires in <strong>{{ expiry_time }}</strong>.</p>
+<p>If the button doesn't work, copy and paste this link into your browser:</p>
+<p style="overflow-wrap:anywhere;"><a href="{{ verification_url }}" style="color:#45efaa;">{{ verification_url }}</a></p>
+<p>If you did not create an Autonix account, you can safely ignore this email.</p>
+{% endblock %}

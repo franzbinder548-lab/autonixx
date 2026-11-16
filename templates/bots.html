@@ -2,7 +2,7 @@
 
 {% block title %}My Bots | Automated Trading Suite | Autonix{% endblock %}
 
-{% block meta_description %}Automated trading tools including Free Bot, Basic Bot, and Expert Bot with live Over 1 analysis.{% endblock %}
+{% block meta_description %}Explore the Free Bot, Basic Bot, Expert Bot, and Bulk Trader in the Autonix automated trading suite.{% endblock %}
 
 {% block body %}
 <div class="app-wrapper">
@@ -19,7 +19,7 @@
           <span class="bots-eyebrow">Automation Suite</span>
           <h1 class="bots-title">Trading Bots</h1>
           <p class="bots-subtitle">
-            Five trading systems with explicit controls, live analysis, and hard session risk limits.
+            Four trading systems with explicit controls, live analysis, and hard session risk limits.
           </p>
 
           <div class="bots-mode-row" id="bots-mode-row">
@@ -96,7 +96,7 @@
             <div>
               <div class="bulk-eyebrow">High-Volume Mode</div>
               <h2 class="bulk-title">Bulk Trader</h2>
-              <p class="bulk-subtitle">Comprehensive market analysis across both strategies. Intelligent trade allocation. Simultaneous execution.</p>
+              <p class="bulk-subtitle">Scan the selected strategy and execute a fixed number of trades at your chosen stake.</p>
             </div>
           </div>
           <span class="bulk-status-pill bulk-status-idle" id="bulk-status-pill">Ready</span>
@@ -110,8 +110,8 @@
           <label class="bot-input-field">
             <span class="bot-input-label">Strategy</span>
             <select id="bulk-strategy" class="bot-select">
-              <option value="both" selected>Both Strategies</option>
-              <option value="differs">Strategy A – Differs</option>
+              <option value="differs" selected>Strategy A – Differs</option>
+              <option value="both">Both Strategies</option>
               <option value="overunder">Strategy B – Over 1 / Under 8</option>
             </select>
           </label>
@@ -121,15 +121,7 @@
           </label>
           <label class="bot-input-field">
             <span class="bot-input-label">Number of Trades</span>
-            <input type="number" id="bulk-num-trades" class="bulk-input" value="10" min="1" max="500" step="1" />
-          </label>
-          <label class="bot-input-field">
-            <span class="bot-input-label">Take Profit (USD)</span>
-            <input type="number" id="bulk-take-profit" class="bulk-input" value="5" min="0" step="1" />
-          </label>
-          <label class="bot-input-field">
-            <span class="bot-input-label">Stop Loss (USD)</span>
-            <input type="number" id="bulk-stop-loss" class="bulk-input" value="100" min="0" step="1" />
+            <input type="number" id="bulk-num-trades" class="bulk-input" value="5" min="1" max="500" step="1" />
           </label>
           <label class="bot-input-field">
             <span class="bot-input-label">Duration</span>
@@ -139,10 +131,6 @@
               <option value="5">5 ticks</option>
               <option value="10">10 ticks</option>
             </select>
-          </label>
-          <label class="bot-input-field">
-            <span class="bot-input-label">Martingale Multiplier</span>
-            <input type="number" id="bulk-martingale" class="bulk-input" value="1" min="1" max="10" step="0.1" />
           </label>
         </div>
 
@@ -245,8 +233,9 @@
           <line x1="12" y1="8" x2="12" y2="12" />
           <line x1="12" y1="16" x2="12.01" y2="16" />
         </svg>
-        Bots execute one trade at a time and stop automatically when TP or SL is
-        reached. Connection drops halt all bots immediately.
+        Bulk Trader uses a fixed stake for each trade and submits the selected
+        number of trades. You can stop it at any time; connection drops halt all
+        bots immediately.
       </div>
     </main>
   </div>
@@ -255,6 +244,6 @@
 
 <div id="toast" class="toast" aria-live="polite"></div>
 {% endblock %} {% block extra_scripts %}
-<script src="{{ url_for('static', filename='js/bots-page.js') }}?v=42"></script>
-<script src="{{ url_for('static', filename='js/bulk-trader.js') }}?v=5"></script>
+<script src="{{ url_for('static', filename='js/bots-page.js') }}?v=43"></script>
+<script src="{{ url_for('static', filename='js/bulk-trader.js') }}?v=6"></script>
 {% endblock %}

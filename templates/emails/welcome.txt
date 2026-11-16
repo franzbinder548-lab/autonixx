@@ -1,0 +1,25 @@
+{% extends "emails/base.txt" %}
+{% block content %}Hello {{ first_name }},
+
+Welcome to Autonix.
+
+Your account has been successfully created, and you're now part of an intelligent trading technology platform built to make automated trading more accessible.
+
+YOUR ACCOUNT IS READY
+
+You can now:
+- Access your personal Autonix dashboard.
+- Explore available AI trading bots.
+- Manage your account and security settings.
+- Connect your Deriv account to unlock trading features.
+
+Your next step: Connect your Deriv account whenever you're ready to start using Autonix trading features.
+
+OPEN MY DASHBOARD: {{ dashboard_url }}
+
+YOUR ACCOUNT DETAILS
+- Name: {{ full_name }}
+- Email: {{ email }}
+- Registration date: {{ registration_date }}
+
+We're glad to have you with us.{% endblock %}

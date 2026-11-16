@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="light">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8" />
   <meta name="google-site-verification" content="eT_GDsu5O5k9yFgq_pk_nmQGj7nak0OC4MQCll8_1u0" />
@@ -37,7 +37,7 @@
   {% endif %}
   <link rel="icon" href="{{ url_for('static', filename='icons/favicon-32.png') }}" />
   <link rel="manifest" href="/manifest.webmanifest" />
-  <meta name="theme-color" content="#FF0000" />
+  <meta name="theme-color" content="#000000" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Autonix" />
@@ -45,24 +45,18 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/tokens.css') }}?v=18" />
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=14" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/tokens.css') }}?v=20" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=15" />
   <link rel="stylesheet" href="{{ url_for('static', filename='css/autonix.css') }}?v=16" />
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/redesign.css') }}?v=15" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/redesign.css') }}?v=29" />
   <style>
-    /* Anti-flash: apply saved theme before CSS loads */
+    /* Apply the shared dark theme before CSS loads. */
     html { visibility: hidden; }
     html.theme-ready { visibility: visible; }
   </style>
   <script>
     (function(){
-      var stored = localStorage.getItem('at_theme');
-      if (stored !== 'light' && stored !== 'dark') {
-        stored = localStorage.getItem('theme');
-      }
-      var t = stored === 'dark' ? 'dark' : 'light';
-      document.documentElement.setAttribute('data-theme', t);
-      if (stored === 'light' || stored === 'dark') localStorage.setItem('at_theme', t);
+      document.documentElement.setAttribute('data-theme', 'dark');
       document.documentElement.classList.add('theme-ready');
     })();
   </script>
@@ -213,18 +207,19 @@
     window.DERIV_APP_ID = "{{ ws_app_id }}";
     window.DERIV_PUBLIC_WS_URL = "{{ public_ws_url or 'wss://api.derivws.com/trading/v1/options/ws/public' }}";
     window.SESSION_DATA = {{ (session_data | tojson) if session_data else 'null' }};
+    window.AUTONIX_USER_ID = {% if autonix_user %}{{ autonix_user.id | tojson }}{% else %}null{% endif %};
     window.REDIRECT_URL = "{{ redirect_url or '' }}" || window.location.origin;
   </script>
   <script src="{{ url_for('static', filename='js/deriv-ws.js') }}?v=16"></script>
-  <script src="{{ url_for('static', filename='js/theme-toggle.js') }}?v=4"></script>
   <script src="{{ url_for('static', filename='js/currency.js') }}?v=1"></script>
+  <script src="{{ url_for('static', filename='js/trade-activity.js') }}?v=1"></script>
   <script src="{{ url_for('static', filename='js/markets-panel.js') }}?v=5"></script>
   <script src="{{ url_for('static', filename='js/chart.js') }}?v=5"></script>
   <script src="{{ url_for('static', filename='js/trade-ticket.js') }}?v=5"></script>
   <script src="{{ url_for('static', filename='js/tp-celebration.js') }}?v=2"></script>
-  <script src="{{ url_for('static', filename='js/bot.js') }}?v=7"></script>
+  <script src="{{ url_for('static', filename='js/bot.js') }}?v=10"></script>
   <script src="{{ url_for('static', filename='js/manual-trader.js') }}?v=1"></script>
-  <script src="{{ url_for('static', filename='js/main.js') }}?v=9"></script>
+  <script src="{{ url_for('static', filename='js/main.js') }}?v=13"></script>
   <script src="{{ url_for('static', filename='js/autonix.js') }}?v=5"></script>
   <script src="{{ url_for('static', filename='js/install-pwa.js') }}?v=5"></script>
   <script src="{{ url_for('static', filename='js/pull-to-refresh.js') }}?v=1"></script>

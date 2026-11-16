@@ -6778,3 +6778,535 @@ html:has(.autonix-auth-page) {
     display: inline-flex;
   }
 }
+
+/* Dashboard command-centre layout */
+.dashboard-app .dash-workspace {
+  padding: clamp(18px, 3vw, 40px);
+}
+
+.dashboard-app .autonix-dashboard-overview {
+  width: min(100%, 1440px);
+  margin: 0 auto;
+  --ad-green: var(--color-brand, #e8002d);
+  --ad-green-soft: var(--color-brand-soft, rgba(232, 0, 45, .1));
+  --ad-green-rgb: 232, 0, 45;
+}
+
+.dashboard-app .ad-welcome {
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.dashboard-app .ad-welcome-actions {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.dashboard-app .ad-connection-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--ad-border);
+  border-radius: 7px;
+  color: var(--ad-muted);
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.dashboard-app .ad-connection-status > span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #858b92;
+}
+
+.dashboard-app .ad-connection-status.is-connected > span {
+  background: #38c987;
+}
+
+.dashboard-app .ad-connection-status.is-disconnected > span {
+  background: var(--color-brand);
+}
+
+.dashboard-app .ad-section {
+  margin: 26px 0;
+}
+
+.dashboard-app .ad-section-heading {
+  align-items: center;
+}
+
+.dashboard-app .ad-section-note {
+  color: var(--ad-muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.dashboard-app .ad-account-overview {
+  margin-top: 0;
+}
+
+.dashboard-app .ad-account-overview .ad-connection-card {
+  display: block;
+  margin: 0;
+  padding: 20px;
+  border-color: var(--ad-border);
+  border-radius: 10px;
+  background: #0a0a0a;
+}
+
+.dashboard-app .ad-account-overview .ad-connection-card.is-connected {
+  border-color: rgba(255, 255, 255, .16);
+}
+
+.dashboard-app .ad-account-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(190px, .7fr) minmax(210px, .9fr);
+  align-items: center;
+  gap: 20px;
+}
+
+.dashboard-app .ad-connection-copy h3 {
+  margin: 7px 0 5px;
+  color: var(--ad-text);
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+.dashboard-app .ad-account-balance {
+  display: grid;
+  gap: 5px;
+  padding-left: 20px;
+  border-left: 1px solid var(--ad-border);
+}
+
+.dashboard-app .ad-account-balance span,
+.dashboard-app .ad-account-balance small {
+  color: var(--ad-muted);
+  font-size: 10px;
+}
+
+.dashboard-app .ad-account-balance strong {
+  color: var(--ad-text);
+  font-size: clamp(20px, 2.2vw, 27px);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.03em;
+}
+
+.dashboard-app .ad-account-summary .ad-connection-actions {
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.dashboard-app .ad-disconnected-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.dashboard-app .ad-disconnect-link {
+  align-self: center;
+  color: var(--ad-muted);
+  font-size: 10px;
+  text-decoration: none;
+}
+
+.dashboard-app .ad-disconnect-link:hover {
+  color: var(--ad-text);
+}
+
+.dashboard-app .ad-trading-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.dashboard-app .ad-trading-stat-card {
+  display: grid;
+  min-width: 0;
+  min-height: 86px;
+  align-content: center;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 1px solid var(--ad-border);
+  border-radius: 8px;
+  background: #0a0a0a;
+}
+
+.dashboard-app .ad-trading-stat-card > span {
+  color: var(--ad-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.dashboard-app .ad-trading-stat-card strong {
+  overflow: hidden;
+  color: var(--ad-text);
+  font-size: 19px;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dashboard-app .ad-trading-stat-card small {
+  color: var(--ad-muted);
+  font-size: 9px;
+  line-height: 1.4;
+}
+
+.dashboard-app .ad-quick-action-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.dashboard-app .ad-quick-actions a {
+  grid-template-columns: 30px 1fr 15px;
+  min-height: 62px;
+  padding: 10px 12px;
+  border: 1px solid var(--ad-border);
+  border-radius: 8px;
+  background: #0a0a0a;
+}
+
+.dashboard-app .ad-quick-actions a:hover {
+  border-color: rgba(var(--ad-green-rgb), .45);
+  background: #0d0d0d;
+}
+
+.dashboard-app .ad-action-mark {
+  display: grid;
+  width: 27px;
+  height: 27px;
+  place-items: center;
+  border-radius: 6px;
+  background: var(--ad-green-soft);
+  color: var(--ad-green);
+}
+
+.dashboard-app .ad-bots-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.dashboard-app .ad-bot-card,
+.dashboard-app .ad-panel {
+  border-radius: 9px;
+  background: #0a0a0a;
+  box-shadow: none;
+}
+
+.dashboard-app .ad-bot-card {
+  padding: 15px;
+}
+
+.dashboard-app .ad-bot-card h3 {
+  font-size: 15px;
+}
+
+.dashboard-app .ad-bot-summary {
+  min-height: 0;
+}
+
+.dashboard-app .ad-bot-card .ad-button {
+  align-self: stretch;
+}
+
+.dashboard-app .ad-market-monitor {
+  margin: 26px 0;
+  padding: 18px;
+  border: 1px solid var(--ad-border);
+  border-radius: 9px;
+}
+
+.dashboard-app .ad-market-monitor .dash-section-heading-row {
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.dashboard-app .ad-market-monitor .ad-eyebrow {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.dashboard-app .ad-market-monitor .dash-section-title {
+  margin: 0;
+  color: var(--ad-text);
+  font-size: 16px;
+}
+
+.dashboard-app .ad-market-monitor .dash-section-note {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 6px;
+  color: var(--ad-muted);
+  font-size: 10px;
+}
+
+.dashboard-app .dash-chart-live-dot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  margin: 0;
+  background: #858b92;
+  box-shadow: none;
+}
+
+.dashboard-app .dash-chart-live-dot.is-live {
+  background: #38c987;
+  box-shadow: 0 0 0 3px rgba(56, 201, 135, .12);
+}
+
+.dashboard-app .dash-chart-live-dot.is-error {
+  background: var(--color-brand);
+}
+
+.dashboard-app .dash-chart-toolbar {
+  margin-bottom: 10px;
+}
+
+.dashboard-app .dash-live-chart-section canvas {
+  height: 240px;
+  border: 1px solid var(--ad-border);
+  border-radius: 6px;
+  background: #070707;
+}
+
+.dashboard-app .ad-dashboard-reports .reports-header {
+  align-items: flex-end;
+}
+
+.dashboard-app .ad-dashboard-reports .reports-header .ad-section-note {
+  margin: 5px 0 0;
+}
+
+.dashboard-app .ad-performance-chart-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 12px;
+  border: 1px solid var(--ad-border);
+  border-radius: 7px;
+  background: #080808;
+}
+
+.dashboard-app .ad-performance-chart-panel[hidden] {
+  display: none;
+}
+
+.dashboard-app .ad-performance-chart-panel > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.dashboard-app .ad-performance-chart-panel strong {
+  color: var(--ad-text);
+  font-size: 10px;
+}
+
+.dashboard-app .ad-performance-chart-panel span {
+  color: var(--ad-muted);
+  font-size: 9px;
+  text-align: right;
+}
+
+.dashboard-app #dashboard-performance-chart {
+  display: block;
+  width: 100%;
+  height: 110px;
+}
+
+.dashboard-app .ad-history-scope-note {
+  margin: 12px 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(var(--ad-green-rgb), .24);
+  border-radius: 6px;
+  background: var(--ad-green-soft);
+  color: var(--ad-muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.dashboard-app .ad-account-management {
+  padding-top: 3px;
+}
+
+.dashboard-app .ad-accounts-grid {
+  grid-template-columns: repeat(auto-fit, minmax(175px, 1fr));
+}
+
+.dashboard-app .ad-wallet-section {
+  margin: 22px 0 0;
+  padding-top: 19px;
+  border-top: 1px solid var(--ad-border);
+}
+
+.dashboard-app .ad-wallet-section .dash-section-heading-row {
+  margin-bottom: 12px;
+}
+
+.dashboard-app .ad-security-panel p {
+  color: var(--ad-muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.dashboard-app .ad-security-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+.dashboard-app .ad-security-actions form {
+  margin: 0;
+}
+
+.dashboard-app .ad-button:focus-visible,
+.dashboard-app .ad-text-link:focus-visible,
+.dashboard-app .ad-quick-actions a:focus-visible,
+.dashboard-app .dash-account-card:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 3px;
+}
+
+.dashboard-app .ad-profile-panel {
+  padding: 20px;
+  border: 1px solid var(--ad-border);
+  border-radius: 9px;
+  background: #0a0a0a;
+}
+
+.dashboard-app .ad-currency-setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--ad-border);
+}
+
+.dashboard-app .ad-currency-setting strong {
+  color: var(--ad-text);
+  font-size: 11px;
+}
+
+.dashboard-app .ad-currency-setting p {
+  margin: 5px 0 0;
+  color: var(--ad-muted);
+  font-size: 10px;
+}
+
+@media (max-width: 1050px) {
+  .dashboard-app .ad-bots-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .dashboard-app .ad-welcome {
+    align-items: flex-start;
+  }
+
+  .dashboard-app .ad-welcome-actions {
+    gap: 10px;
+  }
+
+  .dashboard-app .ad-account-summary {
+    grid-template-columns: minmax(0, 1fr) minmax(150px, .8fr);
+  }
+
+  .dashboard-app .ad-account-summary .ad-connection-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+
+  .dashboard-app .ad-quick-action-grid,
+  .dashboard-app .ad-trading-stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-app .ad-content-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 540px) {
+  .dashboard-app .dash-workspace {
+    padding: 17px 12px 30px;
+  }
+
+  .dashboard-app .ad-welcome {
+    flex-direction: row;
+    gap: 10px;
+  }
+
+  .dashboard-app .ad-welcome-actions {
+    flex-direction: column-reverse;
+    align-items: flex-end;
+    gap: 8px;
+  }
+
+  .dashboard-app .ad-connection-status {
+    padding: 6px 7px;
+    font-size: 9px;
+  }
+
+  .dashboard-app .ad-profile-menu > summary > span:not(.ad-avatar):not(.ad-profile-chevron) {
+    display: none;
+  }
+
+  .dashboard-app .ad-account-summary,
+  .dashboard-app .ad-disconnected-summary {
+    grid-template-columns: 1fr;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .dashboard-app .ad-account-balance {
+    width: 100%;
+    padding: 12px 0 0;
+    border-top: 1px solid var(--ad-border);
+    border-left: 0;
+  }
+
+  .dashboard-app .ad-account-summary .ad-connection-actions,
+  .dashboard-app .ad-disconnected-summary .ad-connection-actions {
+    width: 100%;
+  }
+
+  .dashboard-app .ad-account-summary .ad-connection-actions .ad-button,
+  .dashboard-app .ad-disconnected-summary .ad-connection-actions .ad-button {
+    flex: 1 1 130px;
+  }
+
+  .dashboard-app .ad-bots-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-app .ad-market-monitor {
+    padding: 14px;
+  }
+
+  .dashboard-app .dash-live-chart-section canvas {
+    height: 200px;
+  }
+
+  .dashboard-app .ad-dashboard-reports .reports-header {
+    align-items: flex-start;
+  }
+
+  .dashboard-app .ad-currency-setting {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

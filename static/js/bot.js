@@ -570,6 +570,7 @@
       stake: trade.stake.toFixed(2),
       pl: pl,
       time: new Date(trade.startTime).toLocaleTimeString(),
+      accountId: getCurrentAccountId() ? String(getCurrentAccountId()) : null,
     });
 
     // Save to localStorage
@@ -878,64 +879,92 @@
   }
 
   window.renderReports = function () {
-    var history = botState.tradeHistory;
+    var allHistory = botState.tradeHistory;
+    var isDashboard = !!$id("dashboard-reports");
+    var accountId = getCurrentAccountId();
+    var history = isDashboard
+      ? allHistory.filter(function (trade) {
+          return accountId && trade.accountId && String(trade.accountId) === String(accountId);
+        })
+      : allHistory;
     var total = history.length;
     var wins = history.filter(function (t) {
-      return t.pl > 0;
+      return Number(t.pl) > 0;
     }).length;
     var losses = total - wins;
     var totalPL = history.reduce(function (s, t) {
-      return s + t.pl;
+      return s + (Number(t.pl) || 0);
     }, 0);
     var totalSt = history.reduce(function (s, t) {
-      return s + parseFloat(t.stake);
+      return s + (parseFloat(t.stake) || 0);
     }, 0);
     var best =
       total > 0
         ? Math.max.apply(
             null,
             history.map(function (t) {
-              return t.pl;
+              return Number(t.pl) || 0;
             }),
           )
         : 0;
-    var winRate = total > 0 ? ((wins / total) * 100).toFixed(1) : "0.0";
+    var winRate = total > 0 ? ((wins / total) * 100).toFixed(1) : null;
 
     function setText(id, val) {
       var el = $id(id);
       if (el) el.textContent = val;
     }
 
-    setText(
-      "rpt-total-pl",
-      displaySignedMoney(totalPL),
-    );
-    setText("rpt-win-rate", winRate + "%");
+    function setDashboardStat(name, value) {
+      document.querySelectorAll('[data-dashboard-stat="' + name + '"]').forEach(function (element) {
+        element.textContent = value;
+      });
+    }
+
+    var plText = total ? displaySignedMoney(totalPL) : "—";
+    var winRateText = winRate === null ? "—" : winRate + "%";
+    setText("rpt-total-pl", plText);
+    setText("rpt-win-rate", winRateText);
     setText("rpt-total-trades", total);
-    setText("rpt-total-staked", displayMoney(totalSt));
-    setText("rpt-wins-losses", wins + " / " + losses);
-    setText("rpt-best-trade", best > 0 ? displaySignedMoney(best) : displayMoney(0));
+    setText("rpt-total-staked", total ? displayMoney(totalSt) : "—");
+    setText("rpt-wins-losses", total ? wins + " / " + losses : "—");
+    setText("rpt-best-trade", total ? displaySignedMoney(best) : "—");
     setText("rpt-count", total + " trade" + (total !== 1 ? "s" : ""));
+    setDashboardStat("total-pl", plText);
+    setDashboardStat("win-rate", winRateText);
+    setDashboardStat("trade-count", String(total));
 
-    // Color total P&L
+    var scopeNote = $id("dashboard-history-scope-note");
+    if (scopeNote) {
+      scopeNote.hidden = !isDashboard || !allHistory.some(function (trade) {
+        return !trade.accountId || String(trade.accountId) !== String(accountId || "");
+      });
+    }
+    renderPerformanceChart(history, totalPL);
+
     var plEl = $id("rpt-total-pl");
-    if (plEl)
-      plEl.className = "reports-stat-value " + (totalPL >= 0 ? "green" : "red");
+    if (plEl) {
+      plEl.className = "reports-stat-value" + (total ? (totalPL >= 0 ? " green" : " red") : "");
+    }
 
-    // Table
     var tbody = $id("reports-tbody");
     if (!tbody) return;
 
-    if (history.length === 0) {
+    if (!total) {
+      var emptyMessage = accountId
+        ? "No trades have been recorded for this Deriv account yet."
+        : "Connect a Deriv account to view account-scoped trading records.";
+      if (isDashboard && allHistory.length) {
+        emptyMessage = "No account-linked trades are available here. Older or other-account history remains in the Bots workspace.";
+      }
       tbody.innerHTML =
-        '<tr class="reports-empty-row"><td colspan="7">No trade history available yet.</td></tr>';
+        '<tr class="reports-empty-row"><td colspan="7">' + escHtml(emptyMessage) + "</td></tr>";
       return;
     }
 
     var rows = history
-      .slice(0, 200)
+      .slice(0, isDashboard ? 5 : 200)
       .map(function (t) {
-        var plClass = t.pl >= 0 ? "pl-profit" : "pl-loss";
+        var plClass = Number(t.pl) >= 0 ? "pl-profit" : "pl-loss";
         var plStr = displaySignedMoney(t.pl);
         return (
           "<tr>" +
@@ -969,10 +998,66 @@
     tbody.innerHTML = rows;
   };
 
+  function renderPerformanceChart(history, totalPL) {
+    var panel = $id("dashboard-performance-chart-panel");
+    var canvas = $id("dashboard-performance-chart");
+    if (!panel || !canvas) return;
+    panel.hidden = history.length < 3;
+    if (panel.hidden) return;
+
+    var cumulative = [0];
+    var runningTotal = 0;
+    for (var index = history.length - 1; index >= 0; index--) {
+      runningTotal += Number(history[index].pl) || 0;
+      cumulative.push(runningTotal);
+    }
+
+    var caption = $id("dashboard-performance-chart-caption");
+    if (caption) {
+      caption.textContent = history.length + " trades · " + displaySignedMoney(totalPL);
+    }
+    var context = canvas.getContext("2d");
+    if (!context) return;
+    var ratio = window.devicePixelRatio || 1;
+    var width = canvas.clientWidth || 600;
+    var height = canvas.clientHeight || 120;
+    canvas.width = width * ratio;
+    canvas.height = height * ratio;
+    context.setTransform(ratio, 0, 0, ratio, 0, 0);
+    context.clearRect(0, 0, width, height);
+
+    var padding = 8;
+    var minimum = Math.min.apply(null, cumulative);
+    var maximum = Math.max.apply(null, cumulative);
+    var range = maximum - minimum || 1;
+    var zeroY = padding + ((maximum / range) * (height - padding * 2));
+    context.strokeStyle = "rgba(255,255,255,.16)";
+    context.lineWidth = 1;
+    context.beginPath();
+    context.moveTo(padding, zeroY);
+    context.lineTo(width - padding, zeroY);
+    context.stroke();
+
+    context.beginPath();
+    cumulative.forEach(function (value, pointIndex) {
+      var x = padding + pointIndex * (width - padding * 2) / (cumulative.length - 1);
+      var y = padding + ((maximum - value) / range) * (height - padding * 2);
+      if (pointIndex) context.lineTo(x, y);
+      else context.moveTo(x, y);
+    });
+    context.strokeStyle = getComputedStyle(canvas).getPropertyValue("--color-brand").trim() || "#e8002d";
+    context.lineWidth = 2;
+    context.stroke();
+  }
+
   window.addEventListener("displaycurrencychange", function () {
     window.renderReports();
     updatePositionsPanel();
     updateSessionStats();
+  });
+  window.addEventListener("resize", function () {
+    var chart = $id("dashboard-performance-chart-panel");
+    if (chart && !chart.hidden) window.renderReports();
   });
 
   function escHtml(s) {

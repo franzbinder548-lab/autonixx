@@ -1,93 +1,131 @@
 <div class="autonix-dashboard-overview">
   <header class="ad-welcome">
     <div>
-      <span class="ad-eyebrow">AUTONIX WORKSPACE</span>
-      <h1>Welcome back, {{ autonix_user.full_name|upper }}</h1>
-      <p>{{ autonix_user.email }} <span aria-hidden="true">·</span> Your intelligent trading workspace is ready.</p>
+      <span class="ad-eyebrow">TRADING DASHBOARD <span aria-hidden="true">·</span> <time id="dashboard-current-date"></time></span>
+      <h1>Welcome back, {{ autonix_user.full_name }}</h1>
+      <p>{{ autonix_user.email }} <span aria-hidden="true">·</span> Your account and trading workspace at a glance.</p>
     </div>
-    <details class="ad-profile-menu">
-      <summary>
-        <span class="ad-avatar" aria-hidden="true">{{ autonix_user.full_name[:1]|upper }}</span>
-        <span><strong>{{ autonix_user.full_name }}</strong><small>Autonix account</small></span>
-        <span class="ad-profile-chevron" aria-hidden="true">⌄</span>
-      </summary>
-      <div class="ad-profile-popover">
-        <span>{{ autonix_user.email }}</span>
-        <a href="#account-profile">Manage profile</a>
-        <form method="post" action="{{ url_for('autonix_auth.logout') }}">
-          <input type="hidden" name="csrf_token" value="{{ autonix_csrf_token }}">
-          <button type="submit">Log out of Autonix</button>
-        </form>
-      </div>
-    </details>
+    <div class="ad-welcome-actions">
+      <span class="ad-connection-status {% if deriv_connected %}is-connected{% else %}is-disconnected{% endif %}">
+        <span aria-hidden="true"></span>{{ 'Deriv connected' if deriv_connected else 'Deriv not connected' }}
+      </span>
+      <details class="ad-profile-menu">
+        <summary>
+          <span class="ad-avatar" aria-hidden="true">{{ autonix_user.full_name[:1]|upper }}</span>
+          <span><strong>{{ autonix_user.full_name }}</strong><small>Autonix account</small></span>
+          <span class="ad-profile-chevron" aria-hidden="true">⌄</span>
+        </summary>
+        <div class="ad-profile-popover">
+          <span>{{ autonix_user.email }}</span>
+          <a href="#account-profile">Manage profile</a>
+          <form method="post" action="{{ url_for('autonix_auth.logout') }}">
+            <input type="hidden" name="csrf_token" value="{{ autonix_csrf_token }}">
+            <button type="submit">Log out of Autonix</button>
+          </form>
+        </div>
+      </details>
+    </div>
   </header>
 
   {% if session.get("autonix_deriv_link_error") %}
   <p class="ad-alert" role="alert">{{ session.get("autonix_deriv_link_error") }}</p>
   {% endif %}
 
-  <section class="ad-connection-card {% if deriv_connected %}is-connected{% else %}is-disconnected{% endif %}" aria-labelledby="ad-connection-title">
-    <div class="ad-connection-copy">
-      <span class="ad-eyebrow">TRADING ACCOUNT</span>
-      <h2 id="ad-connection-title">
-        {% if deriv_connected and session_data %}
-        Deriv account connected
-        {% else %}
-        Connect your Deriv account
-        {% endif %}
-      </h2>
-      {% if deriv_connected and session_data %}
-      <p>
-        {{ session_data.activeAccount.account }}
-        <span aria-hidden="true">·</span>
-        {{ 'Demo account' if session_data.activeAccount.isVirtual else 'Real account' }}
-        <span aria-hidden="true">·</span>
-        {{ session_data.activeAccount.currency }}
-      </p>
-      {% else %}
-      <p>Your Autonix account is ready. Connect Deriv to unlock live trading, account balances, and bot execution.</p>
+  <section class="ad-section ad-account-overview" aria-labelledby="ad-account-overview-heading">
+    <div class="ad-section-heading">
+      <div>
+        <span class="ad-eyebrow">ACCOUNT OVERVIEW</span>
+        <h2 id="ad-account-overview-heading">Selected trading account</h2>
+      </div>
+      {% if deriv_connected and session_data and session_data.isAuthenticated %}
+      <span class="dash-environment-badge {% if session_data.activeAccount.isVirtual %}is-demo{% else %}is-real{% endif %}">
+        {{ 'DEMO ACCOUNT' if session_data.activeAccount.isVirtual else 'REAL ACCOUNT' }}
+      </span>
       {% endif %}
     </div>
-    <div class="ad-connection-actions">
-      {% if deriv_connected and session_data %}
-      <a class="ad-button ad-button-primary" href="#dashboard-accounts">Switch account</a>
-      <a class="ad-button ad-button-secondary" href="/auth/logout">Disconnect</a>
+    <div class="ad-connection-card {% if deriv_connected %}is-connected{% else %}is-disconnected{% endif %}">
+      {% if deriv_connected and session_data and session_data.isAuthenticated %}
+      <div class="ad-account-summary">
+        <div class="ad-connection-copy">
+          <span class="ad-eyebrow">DERIV ACCOUNT</span>
+          <h3>{{ session_data.activeAccount.account }}</h3>
+          <p>{{ 'Demo account' if session_data.activeAccount.isVirtual else 'Real account' }} <span aria-hidden="true">·</span> {{ session_data.activeAccount.currency }}</p>
+        </div>
+        <div class="ad-account-balance">
+          <span>Available balance</span>
+          {% if session_data.activeAccount.balance is defined and session_data.activeAccount.currency is defined %}
+          <strong id="dash-balance-amount" data-account-balance data-account-amount="{{ session_data.activeAccount.balance }}" data-account-currency="{{ session_data.activeAccount.currency }}" data-account-id="{{ session_data.activeAccount.account }}">{{ "{:,.2f}".format(session_data.activeAccount.balance|float) }} {{ session_data.activeAccount.currency }}</strong>
+          {% else %}
+          <strong id="dash-balance-amount">Balance unavailable</strong>
+          {% endif %}
+          <small>Balance in account currency</small>
+        </div>
+        <div class="ad-connection-actions">
+          <a class="ad-button ad-button-primary" href="/trader">Open Trader</a>
+          <a class="ad-button ad-button-secondary" href="#dashboard-accounts">Manage accounts</a>
+          <a class="ad-disconnect-link" href="/auth/logout">Disconnect Deriv</a>
+        </div>
+      </div>
       {% else %}
-      <a class="ad-button ad-button-primary" href="/auth/login">Connect Deriv Account</a>
-      <a class="ad-button ad-button-secondary" href="https://t.deriv.link?t=99THF5S5V9K8" target="_blank" rel="noopener noreferrer">Sign Up with Deriv</a>
+      <div class="ad-disconnected-summary">
+        <div class="ad-connection-copy">
+          <span class="ad-eyebrow">TRADING ACCOUNT</span>
+          <h3 id="ad-connection-title">Connect your Deriv account</h3>
+          <p>Your Autonix account is ready. Connect Deriv to access account balances, trading, and bot execution.</p>
+        </div>
+        <div class="ad-connection-actions">
+          <a class="ad-button ad-button-primary" href="/auth/login">Connect Deriv account</a>
+          <a class="ad-button ad-button-secondary" href="https://t.deriv.link?t=99THF5S5V9K8" target="_blank" rel="noopener noreferrer">Sign up with Deriv</a>
+        </div>
+      </div>
       {% endif %}
     </div>
   </section>
 
-  <section class="ad-section" aria-labelledby="ad-overview-heading">
+  <section class="ad-section ad-performance-overview" aria-labelledby="ad-performance-overview-heading">
     <div class="ad-section-heading">
-      <div><span class="ad-eyebrow">AT A GLANCE</span><h2 id="ad-overview-heading">Workspace overview</h2></div>
+      <div>
+        <span class="ad-eyebrow">ACCOUNT PERFORMANCE</span>
+        <h2 id="ad-performance-overview-heading">Trading at a glance</h2>
+      </div>
+      <span class="ad-section-note">Based on recorded trades for the selected Deriv account</span>
     </div>
-    <div class="ad-stats-grid">
-      <article class="ad-stat-card">
-        <span>Autonix account</span><strong>{{ autonix_user.status|title }}</strong><small>Your website identity is active.</small>
+    <div class="ad-trading-stats-grid">
+      <article class="ad-trading-stat-card">
+        <span>Total P&amp;L</span>
+        <strong data-dashboard-stat="total-pl">—</strong>
       </article>
-      <article class="ad-stat-card">
-        <span>Deriv connection</span><strong>{{ 'Connected' if deriv_connected else 'Not connected' }}</strong><small>{{ 'Trading authorization is active.' if deriv_connected else 'Connect Deriv to unlock trading.' }}</small>
+      <article class="ad-trading-stat-card">
+        <span>Win rate</span>
+        <strong data-dashboard-stat="win-rate">—</strong>
       </article>
-      <article class="ad-stat-card ad-stat-highlight">
-        <span>Available AI bots</span><strong>{{ dashboard_bots|length }}</strong><small>Browse the existing Bots workspace.</small>
+      <article class="ad-trading-stat-card">
+        <span>Total trades</span>
+        <strong data-dashboard-stat="trade-count">—</strong>
       </article>
-      <article class="ad-stat-card">
-        <span>Active bots</span><strong class="ad-stat-muted">Not tracked</strong><small>Live bot sessions are not persisted on this dashboard.</small>
-      </article>
-      <article class="ad-stat-card">
-        <span>Total trades</span><strong class="ad-stat-muted">{% if deriv_connected %}View Trader{% else %}Connect Deriv to view{% endif %}</strong><small>Autonix does not store a trade-history total here.</small>
-      </article>
-      <article class="ad-stat-card">
-        <span>Trading performance</span><strong class="ad-stat-muted">{% if deriv_connected %}View Trader{% else %}Connect Deriv to view{% endif %}</strong><small>No performance figures are shown without verified records.</small>
+      <article class="ad-trading-stat-card">
+        <span>Active bots</span>
+        <strong>Not tracked</strong>
+        <small>Live bot sessions are not persisted on the dashboard.</small>
       </article>
     </div>
+  </section>
+
+  <section class="ad-section" aria-labelledby="ad-quick-heading">
+    <div class="ad-section-heading">
+      <div><span class="ad-eyebrow">SHORTCUTS</span><h2 id="ad-quick-heading">Quick actions</h2></div>
+    </div>
+    <nav class="ad-quick-actions ad-quick-action-grid" aria-label="Dashboard quick actions">
+      <a href="/trader"><span class="ad-action-mark" aria-hidden="true">01</span><strong>Open Trader</strong><b aria-hidden="true">→</b></a>
+      <a href="/bots"><span class="ad-action-mark" aria-hidden="true">02</span><strong>Explore AI Bots</strong><b aria-hidden="true">→</b></a>
+      <a href="/journal"><span class="ad-action-mark" aria-hidden="true">03</span><strong>Trading Journal</strong><b aria-hidden="true">→</b></a>
+      <a href="{% if deriv_connected %}#dashboard-accounts{% else %}/auth/login{% endif %}"><span class="ad-action-mark" aria-hidden="true">04</span><strong>Manage Accounts</strong><b aria-hidden="true">→</b></a>
+    </nav>
   </section>
 
   <section class="ad-section" id="ai-bots" aria-labelledby="ad-bots-heading">
     <div class="ad-section-heading">
-      <div><span class="ad-eyebrow">AUTOMATION SUITE</span><h2 id="ad-bots-heading">AI Bots</h2><p>Explore the bot strategies already available in Autonix.</p></div>
+      <div><span class="ad-eyebrow">AUTOMATION SUITE</span><h2 id="ad-bots-heading">AI Bots</h2><p>Explore the trading products available in Autonix.</p></div>
       <a class="ad-text-link" href="/bots">Open Bots workspace <span aria-hidden="true">→</span></a>
     </div>
     <div class="ad-bots-grid">
@@ -117,19 +155,55 @@
     </div>
   </section>
 
-  {% include "partials/dashboard_reports.html" %}
-
-  <section class="dash-section dash-surface dash-live-chart-section" aria-labelledby="dash-chart-heading">
+  <section class="dash-section dash-surface dash-live-chart-section ad-market-monitor" aria-labelledby="dash-chart-heading">
     <div class="dash-section-heading-row">
       <div>
-        <h2 class="dash-section-title" id="dash-chart-heading">Live market chart</h2>
-        <p class="dash-section-note"><span class="dash-chart-live-dot"></span> Public market feed · Volatility 100 (1s)</p>
+        <span class="ad-eyebrow">LIVE MARKET MONITOR</span>
+        <h2 class="dash-section-title" id="dash-chart-heading">Volatility 100 (1s)</h2>
+        <p class="dash-section-note"><span class="dash-chart-live-dot" id="dash-chart-live-indicator" aria-hidden="true"></span><span id="dash-chart-status">Connecting to public market data…</span></p>
       </div>
       <a class="dash-inline-link" href="/trader">Open Trader <span aria-hidden="true">→</span></a>
     </div>
     <div class="dash-chart-toolbar"><strong id="dash-chart-symbol">Volatility 100 (1s)</strong><span id="dash-chart-price">Connecting…</span></div>
     <canvas id="dash-live-chart" aria-label="Live Volatility 100 (1s) price chart"></canvas>
-    <div class="dash-chart-status" id="dash-chart-status">Connecting to public market data…</div>
+  </section>
+
+  {% include "partials/dashboard_reports.html" %}
+
+  <section class="ad-section ad-account-management" id="dashboard-accounts" aria-labelledby="dash-accounts-heading">
+    <div class="ad-section-heading">
+      <div><span class="ad-eyebrow">CONNECTED ACCOUNTS</span><h2 id="dash-accounts-heading">Account management</h2><p>Switch between Deriv accounts without leaving your dashboard.</p></div>
+      {% if deriv_connected and session_data and session_data.isAuthenticated %}
+      <span class="ad-section-note">{{ session_data.accounts|length }} connected account{{ '' if session_data.accounts|length == 1 else 's' }}</span>
+      {% endif %}
+    </div>
+    {% if deriv_connected and session_data and session_data.isAuthenticated %}
+    <div class="dash-accounts-grid ad-accounts-grid" role="list">
+      {% for acc in session_data.accounts %}
+      <a href="{{ url_for('switch_account_get', account_id=acc.account, next=request.full_path) }}" class="dash-account-card {% if acc.account == session_data.activeAccount.account %}dash-account-active{% endif %}" role="listitem" aria-current="{{ 'true' if acc.account == session_data.activeAccount.account else 'false' }}">
+        <div class="dash-acct-top"><span class="dash-acct-avatar" aria-hidden="true">{{ acc.account[:2] }}</span>{% if acc.account == session_data.activeAccount.account %}<span class="dash-acct-active-badge">Active</span>{% else %}<span class="dash-acct-switch-hint">Switch</span>{% endif %}</div>
+        <div class="dash-acct-id">{{ acc.account }}</div>
+        <div class="dash-acct-type">{% if acc.isVirtual %}Demo account{% else %}Real account <span aria-hidden="true">·</span> {{ acc.currency }}{% endif %}</div>
+        {% if acc.balance is defined and acc.currency is defined %}
+        <div class="dash-acct-balance" data-account-balance data-account-amount="{{ acc.balance }}" data-account-currency="{{ acc.currency }}" data-account-id="{{ acc.account }}">{{ "{:,.2f}".format(acc.balance|float) }} {{ acc.currency }}</div>
+        {% else %}
+        <div class="dash-acct-balance">Balance unavailable</div>
+        {% endif %}
+      </a>
+      {% endfor %}
+    </div>
+    <section class="dash-section dash-finance-section ad-wallet-section" aria-labelledby="dash-finance-heading">
+      <div class="dash-section-heading-row">
+        <div><h3 class="dash-section-title" id="dash-finance-heading">Wallets &amp; balances</h3><p class="dash-section-note">Move funds between your Deriv Wallet and eligible real trading accounts.</p></div>
+        <button class="nav-btn nav-btn-filled dash-transfer-trigger" type="button" data-transfer-open>Transfer funds</button>
+      </div>
+      <div class="dash-finance-grid" id="dash-finance-grid">
+        <div class="dash-finance-placeholder">Loading your wallet balances&hellip;</div>
+      </div>
+    </section>
+    {% else %}
+    <div class="ad-empty-state"><strong>No Deriv accounts connected</strong><span>Connect a Deriv account to view balances, switch accounts, and manage eligible wallet transfers.</span><a class="ad-text-link" href="/auth/login">Connect Deriv account <span aria-hidden="true">→</span></a></div>
+    {% endif %}
   </section>
 
   <div class="ad-content-grid">
@@ -149,32 +223,25 @@
       {% else %}
       <div class="ad-empty-state"><strong>No account activity yet</strong><span>Account events will appear here when available.</span></div>
       {% endif %}
-      <p class="ad-footnote">Trading records are available in the Trader or Bots workspace when those services provide them.</p>
     </section>
-
-    <section class="ad-panel" aria-labelledby="ad-quick-heading">
+    <section class="ad-panel ad-security-panel" aria-labelledby="ad-security-heading">
       <div class="ad-section-heading">
-        <div><span class="ad-eyebrow">SHORTCUTS</span><h2 id="ad-quick-heading">Quick actions</h2></div>
+        <div><span class="ad-eyebrow">SECURITY</span><h2 id="ad-security-heading">Account access</h2></div>
       </div>
-      <div class="ad-quick-actions">
-        <a href="/bots"><span>01</span><strong>Browse AI Bots</strong><b aria-hidden="true">→</b></a>
-        {% if deriv_connected %}
-        <a href="#dashboard-accounts"><span>02</span><strong>Manage Deriv accounts</strong><b aria-hidden="true">→</b></a>
-        {% else %}
-        <a href="/auth/login"><span>02</span><strong>Connect Deriv Account</strong><b aria-hidden="true">→</b></a>
-        {% endif %}
-        <a href="/trader"><span>03</span><strong>View Trading Activity</strong><b aria-hidden="true">→</b></a>
-        <a href="#dashboard-reports"><span>04</span><strong>View Trading Reports</strong><b aria-hidden="true">→</b></a>
-        <a href="/journal"><span>05</span><strong>Trading Journal</strong><b aria-hidden="true">→</b></a>
-        <a href="#account-profile"><span>06</span><strong>Manage profile</strong><b aria-hidden="true">→</b></a>
-        <a href="#account-settings"><span>07</span><strong>Account settings</strong><b aria-hidden="true">→</b></a>
+      <p>Autonix sign-out and Deriv disconnection are separate actions.</p>
+      <div class="ad-security-actions">
+        <a class="ad-button ad-button-secondary" href="/auth/logout">Disconnect Deriv</a>
+        <form method="post" action="{{ url_for('autonix_auth.logout') }}">
+          <input type="hidden" name="csrf_token" value="{{ autonix_csrf_token }}">
+          <button class="ad-button ad-button-secondary" type="submit">Log out of Autonix</button>
+        </form>
       </div>
     </section>
   </div>
 
   <section class="ad-panel ad-profile-panel" id="account-profile" aria-labelledby="ad-profile-heading">
     <div class="ad-section-heading">
-      <div><span class="ad-eyebrow">YOUR AUTONIX IDENTITY</span><h2 id="ad-profile-heading">Profile &amp; account settings</h2><p>Update your display name and review your account details.</p></div>
+      <div><span class="ad-eyebrow">YOUR AUTONIX IDENTITY</span><h2 id="ad-profile-heading">Profile &amp; account settings</h2><p>Review your personal details and display preferences.</p></div>
     </div>
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% for category, message in messages %}
@@ -200,10 +267,7 @@
       </form>
     </div>
     <div class="ad-currency-setting">
-      <div>
-        <strong>Display currency</strong>
-        <p>Choose how balances and performance values are shown.</p>
-      </div>
+      <div><strong>Display currency</strong><p>Choose how balances and performance values are shown.</p></div>
       {% include "partials/currency_switcher.html" %}
     </div>
     {% if not autonix_user.email_verified %}

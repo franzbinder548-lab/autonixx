@@ -17,7 +17,7 @@
       {% if autonix_user %}
       {% include "partials/dashboard_overview.html" %}
 
-      {% if deriv_connected and session_data and session_data.isAuthenticated %}
+      {% if false and deriv_connected and session_data and session_data.isAuthenticated %}
 
       <!-- Header bar -->
       <div class="dash-topbar">
@@ -239,6 +239,7 @@ document.addEventListener("derivBalance", function (e) {
   function initLiveChart() {
     var canvas = document.getElementById("dash-live-chart");
     var status = document.getElementById("dash-chart-status");
+    var indicator = document.getElementById("dash-chart-live-indicator");
     var price = document.getElementById("dash-chart-price");
     if (!canvas) return;
     var context = canvas.getContext("2d");
@@ -247,6 +248,13 @@ document.addEventListener("derivBalance", function (e) {
     var socket = null;
     var reconnectTimer = null;
     var chartConfig = null;
+    function setStatus(message, state) {
+      status.textContent = message;
+      if (indicator) {
+        indicator.classList.remove("is-live", "is-error", "is-connecting");
+        if (state) indicator.classList.add("is-" + state);
+      }
+    }
     function draw() {
       var ratio = window.devicePixelRatio || 1;
       var width = canvas.clientWidth || 600;
@@ -274,9 +282,64 @@ document.addEventListener("derivBalance", function (e) {
       context.beginPath(); values.forEach(function (value, index) { var lineX = plot.left + index * plotWidth / (values.length - 1); var lineY = plot.top + plotHeight - ((value - min) / span) * plotHeight; index ? context.lineTo(lineX, lineY) : context.moveTo(lineX, lineY); });
       context.strokeStyle = "#00e5a0"; context.lineWidth = 2; context.stroke();
     }
-    function connect() { if (!chartConfig) return; status.textContent = "Connecting to Deriv market data…"; socket = new WebSocket(chartConfig.websocketUrl); socket.onopen = function () { status.textContent = "LIVE · receiving real-time ticks"; socket.send(JSON.stringify({ ticks_history: chartConfig.symbol, count: 80, end: "latest", style: "ticks" })); socket.send(JSON.stringify({ ticks: chartConfig.symbol, subscribe: 1 })); }; socket.onmessage = function (event) { var message = JSON.parse(event.data); if (message.error) { status.textContent = message.error.message || "Deriv market data request failed."; return; } if (message.history && Array.isArray(message.history.prices)) { values = message.history.prices.map(Number).filter(Number.isFinite).slice(-80); times = (message.history.times || []).slice(-values.length); if (values.length) price.textContent = values[values.length - 1].toFixed(4); draw(); return; } if (!message.tick) return; var latest = Number(message.tick.quote); if (!Number.isFinite(latest)) return; values.push(latest); times.push(Number(message.tick.epoch) || Math.floor(Date.now() / 1000)); if (values.length > 80) { values.shift(); times.shift(); } price.textContent = latest.toFixed(4); draw(); }; socket.onerror = function () { status.textContent = "Live feed interrupted; reconnecting…"; }; socket.onclose = function () { if (chartConfig) reconnectTimer = setTimeout(connect, 1500); }; }
-    fetch("/dashboard/api/live-chart", { credentials: "same-origin" }).then(function (response) { return response.json().then(function (data) { if (!response.ok) throw new Error(data.error || "Market unavailable"); return data; }); }).then(function (config) { chartConfig = config; connect(); }).catch(function (error) { status.textContent = error.message; price.textContent = "—"; });
+    function connect() {
+      if (!chartConfig) return;
+      setStatus("Connecting to Deriv market data…", "connecting");
+      socket = new WebSocket(chartConfig.websocketUrl);
+      socket.onopen = function () {
+        setStatus("LIVE · receiving real-time ticks", "live");
+        socket.send(JSON.stringify({ ticks_history: chartConfig.symbol, count: 80, end: "latest", style: "ticks" }));
+        socket.send(JSON.stringify({ ticks: chartConfig.symbol, subscribe: 1 }));
+      };
+      socket.onmessage = function (event) {
+        var message = JSON.parse(event.data);
+        if (message.error) {
+          setStatus(message.error.message || "Deriv market data request failed.", "error");
+          return;
+        }
+        if (message.history && Array.isArray(message.history.prices)) {
+          values = message.history.prices.map(Number).filter(Number.isFinite).slice(-80);
+          times = (message.history.times || []).slice(-values.length);
+          if (values.length) price.textContent = values[values.length - 1].toFixed(4);
+          draw();
+          return;
+        }
+        if (!message.tick) return;
+        var latest = Number(message.tick.quote);
+        if (!Number.isFinite(latest)) return;
+        values.push(latest);
+        times.push(Number(message.tick.epoch) || Math.floor(Date.now() / 1000));
+        if (values.length > 80) { values.shift(); times.shift(); }
+        price.textContent = latest.toFixed(4);
+        draw();
+      };
+      socket.onerror = function () {
+        setStatus("Live feed interrupted; reconnecting…", "error");
+      };
+      socket.onclose = function () {
+        if (chartConfig) {
+          setStatus("Market feed disconnected; reconnecting…", "connecting");
+          reconnectTimer = setTimeout(connect, 1500);
+        }
+      };
+    }
+    fetch("/dashboard/api/live-chart", { credentials: "same-origin" }).then(function (response) { return response.json().then(function (data) { if (!response.ok) throw new Error(data.error || "Market unavailable"); return data; }); }).then(function (config) {
+      chartConfig = config;
+      var symbol = document.getElementById("dash-chart-symbol");
+      var heading = document.getElementById("dash-chart-heading");
+      if (symbol) symbol.textContent = config.displayName;
+      if (heading) heading.textContent = config.displayName;
+      canvas.setAttribute("aria-label", "Live " + config.displayName + " price chart");
+      connect();
+    }).catch(function (error) {
+      setStatus(error.message, "error");
+      price.textContent = "—";
+    });
     window.addEventListener("resize", draw);
+  }
+  var dashboardDate = document.getElementById("dashboard-current-date");
+  if (dashboardDate) {
+    dashboardDate.textContent = new Intl.DateTimeFormat(undefined, { weekday: "short", month: "short", day: "numeric" }).format(new Date());
   }
   document.querySelectorAll("time[data-dashboard-time]").forEach(function (element) {
     var timestamp = new Date(element.dateTime);

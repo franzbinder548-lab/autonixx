@@ -23,6 +23,7 @@
   function record(trade) {
     try {
       var history = load();
+      var activeAccount = window.SESSION_DATA && window.SESSION_DATA.activeAccount;
       history.unshift({
         type: String(trade.type || "Trade"),
         selection: String(trade.selection || "—"),
@@ -31,6 +32,7 @@
         stake: Number(trade.stake) || 0,
         pl: Number(trade.pl) || 0,
         time: String(trade.time || new Date().toLocaleTimeString()),
+        accountId: activeAccount && activeAccount.account ? String(activeAccount.account) : null,
       });
       if (history.length > 2000) history.length = 2000;
       localStorage.setItem(getStorageKey(), JSON.stringify(history));

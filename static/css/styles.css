@@ -5280,7 +5280,7 @@ video {
   }
 
   body:has(#trade-panel) .bot-inputs-grid {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   body:has(#trade-panel) .bot-field-full {

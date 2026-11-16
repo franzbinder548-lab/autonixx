@@ -949,10 +949,13 @@ textarea:focus {
 .dashboard-app .ad-dashboard-reports .reports-table-wrap {
   min-width: 0;
   flex: none;
+  height: clamp(16rem, 45vh, 28rem);
 }
 
 .dashboard-app .ad-dashboard-reports .reports-table-scroll {
+  min-height: 0;
   overflow-x: auto;
+  overflow-y: auto;
 }
 
 @media (max-width: 720px) {
@@ -6714,5 +6717,64 @@ html:has(.autonix-auth-page) {
   .ad-currency-setting {
     align-items: stretch;
     flex-direction: column;
+  }
+}
+
+.autonix-navbar .navbar-container {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr) max-content max-content;
+  align-items: center;
+}
+
+.autonix-navbar .navbar-account-leading {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  grid-column: 4;
+  justify-self: end;
+  order: 4;
+}
+
+.autonix-navbar .navbar-menu {
+  grid-column: 2;
+  min-width: 0;
+  order: 2;
+}
+
+.autonix-navbar .navbar-end {
+  grid-column: 3;
+  justify-self: end;
+  order: 3;
+}
+
+.autonix-navbar .navbar-logo {
+  flex: 0 0 auto;
+  grid-column: 1;
+  justify-self: start;
+  margin: 0;
+  order: 1;
+}
+
+.autonix-navbar .navbar-logo .nav-logo-name {
+  display: inline;
+  white-space: nowrap;
+}
+
+.autonix-navbar .navbar-account-leading .navbar-account-dropdown {
+  right: 0;
+  left: auto;
+}
+
+@media (max-width: 768px) {
+  .autonix-navbar .navbar-container {
+    padding: 0;
+  }
+
+  .autonix-navbar .navbar-end #navLoginBtn {
+    display: inline-flex;
   }
 }

@@ -62,6 +62,6 @@
     document.querySelectorAll("[data-trading-mode]").forEach(function (button) { button.addEventListener("click", function () { setMode(button.dataset.tradingMode); }); });
     document.querySelectorAll("#trade-type-buttons .trade-type-btn").forEach(function (button) { button.addEventListener("click", function () { state.type = button.dataset.type; renderActions(); }); });
     var digits = id("manual-digit-row"); if (digits) digits.addEventListener("click", function (event) { var button = event.target.closest("[data-digit]"); if (!button) return; state.digit = parseInt(button.dataset.digit, 10); digits.querySelectorAll(".bot-digit-btn").forEach(function (item) { item.classList.toggle("active", item === button); }); });
-    renderActions(); setMode("manual");
+    renderActions(); setMode("bot");
   });
 })();

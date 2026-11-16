@@ -110,36 +110,20 @@ const AppHeader = observer(() => {
 
 
     const renderAccountSection = useCallback(
-        (position: 'left' | 'right' = 'right') => {
+        () => {
             // Show account switcher and logout when user is fully authenticated
             if (activeLoginid && !is_account_regenerating) {
-                if (position === 'left' && !isDesktop) {
-                    // For mobile left section - only account switcher
-                    return (
-                        <div className='auth-actions'>
-                            <DisplayCurrencySwitcher />
-                            <div className='account-info'>
-                                <AccountSwitcher activeAccount={activeAccount} />
-                            </div>
+                return (
+                    <div className='auth-actions'>
+                        <div className='account-info'>
+                            <AccountSwitcher activeAccount={activeAccount} />
                         </div>
-                    );
-                } else if (position === 'right') {
-                    // For right section, show the account switcher on desktop.
-                    return (
-                        <div className='auth-actions'>
-                            {(isDesktop || !activeLoginid) && <DisplayCurrencySwitcher />}
-                            {isDesktop && (
-                                <div className='account-info'>
-                                    <AccountSwitcher activeAccount={activeAccount} />
-                                </div>
-                            )}
-                        </div>
-                    );
-                }
+                        <DisplayCurrencySwitcher />
+                    </div>
+                );
             }
             // Show login button only when fully settled (not during OAuth flow)
             else if (
-                position === 'right' &&
                 !isOAuthPending &&
                 ((!is_account_regenerating && !isAuthorizing && !activeLoginid) || authTimeout)
             ) {
@@ -149,18 +133,18 @@ const AppHeader = observer(() => {
                 const isAuthConfigured = Boolean(process.env.NEXT_PUBLIC_DERIV_APP_ID);
                 return (
                     <div className='auth-actions'>
-                        <DisplayCurrencySwitcher />
                         <Button tertiary disabled={!isAuthConfigured} onClick={handleLogin}>
                             <Localize i18n_default_text='Log in' />
                         </Button>
                         <Button primary_light disabled={!isAuthConfigured} onClick={handleSignup}>
                             <Localize i18n_default_text='Sign up' />
                         </Button>
+                        <DisplayCurrencySwitcher />
                     </div>
                 );
             }
             // Default: Show spinner during loading states or when authorizing
-            else if (position === 'right') {
+            else {
                 return (
                     <div className='auth-actions auth-actions--loading'>
                         <svg
@@ -188,9 +172,7 @@ const AppHeader = observer(() => {
         },
         [
             isAuthorizing,
-            isDesktop,
             activeLoginid,
-            client,
             activeAccount,
             authTimeout,
             is_account_regenerating,
@@ -211,21 +193,24 @@ const AppHeader = observer(() => {
                 })}
             >
                 <Wrapper variant='left' className='react-flask-header__left'>
-                    <MobileMenu onLogout={handleLogout} />
-                    <a href='/' className='react-flask-header__logo' aria-label='Autonix home'>
-                        <span>AT</span>
-                    </a>
-                    <span className='react-flask-header__brand'>AutonixTraders</span>
-                    {isDesktop ? <MenuItems /> : renderAccountSection('left')}
+                    {renderAccountSection()}
+                    {isDesktop && <MenuItems />}
                 </Wrapper>
                 <Wrapper variant='right' className='react-flask-header__right'>
                     {enableThemeToggle && <ChangeTheme />}
-                    <button className='react-flask-header__notification' type='button' aria-label='Notifications' title='Notifications'>
-                        <svg width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2' aria-hidden='true'>
-                            <path d='M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9' /><path d='M13.73 21a2 2 0 0 1-3.46 0' />
-                        </svg>
-                    </button>
-                    {renderAccountSection('right')}
+                    {isDesktop ? (
+                        <button className='react-flask-header__notification' type='button' aria-label='Notifications' title='Notifications'>
+                            <svg width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2' aria-hidden='true'>
+                                <path d='M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9' /><path d='M13.73 21a2 2 0 0 1-3.46 0' />
+                            </svg>
+                        </button>
+                    ) : (
+                        <MobileMenu onLogout={handleLogout} />
+                    )}
+                    <a href='/' className='react-flask-header__logo' aria-label='Autonix home'>
+                        <span>AT</span>
+                    </a>
+                    <span className='react-flask-header__brand'>Autonix Trading</span>
                 </Wrapper>
             </Header>
         </>

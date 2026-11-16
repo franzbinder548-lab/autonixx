@@ -27,9 +27,6 @@ class AutonixAuthTests(unittest.TestCase):
                 "SMTP_ENCRYPTION": "",
                 "MAIL_FROM_NAME": "",
                 "MAIL_FROM_ADDRESS": "",
-                "AUTONIX_GOOGLE_CLIENT_ID": "",
-                "AUTONIX_GOOGLE_CLIENT_SECRET": "",
-                "AUTONIX_GOOGLE_REDIRECT_URI": "",
             },
         )
         self.environment.start()
@@ -503,20 +500,14 @@ class AutonixAuthTests(unittest.TestCase):
         self.assertIn(b"MAIL_FROM_ADDRESS", response.data)
         self.assertFalse(os.path.exists(self.database_path))
 
-    def test_google_sign_in_fails_explicitly_when_oauth_settings_are_missing(self):
-        response = self.client.get("/auth/google")
-        self.assertEqual(response.status_code, 503)
-        self.assertIn(b"AUTONIX_GOOGLE_CLIENT_ID", response.data)
-        self.assertIn(b"AUTONIX_GOOGLE_REDIRECT_URI", response.data)
+    def test_google_sign_in_is_unavailable_for_autonix_accounts(self):
+        for path in ("/auth/google", "/auth/google/callback"):
+            self.assertEqual(self.client.get(path).status_code, 404)
 
-    def test_google_state_is_signed_and_rejects_external_redirects(self):
-        with flask_app.app.app_context():
-            state, nonce = auth._google_state_encode("https://example.com/")
-            self.assertEqual(
-                auth._google_state_decode(state),
-                (nonce, "/dashboard"),
-            )
-            self.assertIsNone(auth._google_state_decode(state + "x"))
+        for path in ("/login", "/register"):
+            response = self.client.get(path)
+            self.assertEqual(response.status_code, 200)
+            self.assertNotIn(b"Continue with Google", response.data)
 
     def test_password_hash_is_not_stored_as_plaintext(self):
         self._register()

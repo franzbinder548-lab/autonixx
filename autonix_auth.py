@@ -1,16 +1,11 @@
-import base64
 import hashlib
 import hmac
 import ipaddress
-import json
 import os
 import secrets
 import smtplib
 import sqlite3
 import ssl
-import urllib.error
-import urllib.parse
-import urllib.request
 from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
 from email.utils import formataddr
@@ -36,9 +31,6 @@ PASSWORD_RESET_LIFETIME = timedelta(hours=1)
 EMAIL_VERIFICATION_LIFETIME = timedelta(hours=24)
 SECURITY_SUPPORT_URL = "https://wa.me/254776685670"
 DEFAULT_PUBLIC_URL = "https://autonixtrading.online"
-GOOGLE_AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/v2/auth"
-GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
-GOOGLE_USERINFO_URL = "https://openidconnect.googleapis.com/v1/userinfo"
 
 
 def _utc_now():
@@ -596,80 +588,6 @@ def _delete_password_reset(token_hash):
         connection.close()
 
 
-def _google_config():
-    client_id = os.getenv("AUTONIX_GOOGLE_CLIENT_ID", "").strip()
-    client_secret = os.getenv("AUTONIX_GOOGLE_CLIENT_SECRET", "").strip()
-    redirect_uri = os.getenv("AUTONIX_GOOGLE_REDIRECT_URI", "").strip()
-    missing = [
-        name
-        for name, value in (
-            ("AUTONIX_GOOGLE_CLIENT_ID", client_id),
-            ("AUTONIX_GOOGLE_CLIENT_SECRET", client_secret),
-            ("AUTONIX_GOOGLE_REDIRECT_URI", redirect_uri),
-        )
-        if not value
-    ]
-    if missing:
-        raise ValueError("Missing Google OAuth settings: " + ", ".join(missing))
-    return client_id, client_secret, redirect_uri
-
-
-def _google_state_encode(next_url):
-    nonce = secrets.token_urlsafe(32)
-    payload = base64.urlsafe_b64encode(
-        json.dumps(
-            {"nonce": nonce, "next": _safe_next(next_url)},
-            separators=(",", ":"),
-        ).encode("utf-8")
-    ).rstrip(b"=")
-    secret = current_app.secret_key
-    if isinstance(secret, str):
-        secret = secret.encode("utf-8")
-    signature = hmac.new(secret, payload, hashlib.sha256).hexdigest().encode("ascii")
-    return payload.decode("ascii") + "." + signature.decode("ascii"), nonce
-
-
-def _google_state_decode(state):
-    try:
-        payload_text, signature = state.split(".", 1)
-        secret = current_app.secret_key
-        if isinstance(secret, str):
-            secret = secret.encode("utf-8")
-        expected = hmac.new(
-            secret, payload_text.encode("ascii"), hashlib.sha256
-        ).hexdigest()
-        if not hmac.compare_digest(expected, signature):
-            return None
-        padded = payload_text + "=" * (-len(payload_text) % 4)
-        payload = json.loads(base64.urlsafe_b64decode(padded.encode("ascii")))
-        if (
-            not isinstance(payload, dict)
-            or not isinstance(payload.get("nonce"), str)
-            or not payload["nonce"]
-            or not isinstance(payload.get("next"), str)
-        ):
-            return None
-        return payload["nonce"], _safe_next(payload["next"])
-    except (ValueError, TypeError, UnicodeError):
-        return None
-
-
-def _google_request(url, payload=None, access_token=None):
-    data = (
-        urllib.parse.urlencode(payload).encode("utf-8")
-        if payload is not None
-        else None
-    )
-    headers = {"Accept": "application/json"}
-    if data is not None:
-        headers["Content-Type"] = "application/x-www-form-urlencoded"
-    if access_token:
-        headers["Authorization"] = "Bearer " + access_token
-    request_object = urllib.request.Request(url, data=data, headers=headers)
-    with urllib.request.urlopen(request_object, timeout=15) as response:
-        return json.loads(response.read().decode("utf-8"))
-
-
 @autonix_auth.route("/register", methods=["GET", "POST"])
 def register():
     if request.method == "GET":
@@ -1021,200 +939,6 @@ def resend_email_verification():
     else:
         flash("The verification email could not be sent. Please try again later.", "error")
     return redirect("/dashboard#account-profile")
-
-
-@autonix_auth.route("/auth/google")
-def google_login():
-    try:
-        client_id, _, redirect_uri = _google_config()
-    except ValueError as exc:
-        current_app.logger.error("Google OAuth is not configured: %s", exc)
-        flash(str(exc), "error")
-        return _render_auth("login", 503)
-    state, nonce = _google_state_encode(request.args.get("next", ""))
-    params = urllib.parse.urlencode(
-        {
-            "client_id": client_id,
-            "redirect_uri": redirect_uri,
-            "response_type": "code",
-            "scope": "openid email profile",
-            "state": state,
-            "prompt": "select_account",
-        }
-    )
-    response = redirect(GOOGLE_AUTHORIZE_URL + "?" + params)
-    response.set_cookie(
-        "autonix_google_state",
-        nonce,
-        max_age=600,
-        httponly=True,
-        secure=current_app.config["SESSION_COOKIE_SECURE"],
-        samesite="Lax",
-        path="/auth/google/callback",
-    )
-    return response
-
-
-def _clear_google_state_cookie(response):
-    response.delete_cookie(
-        "autonix_google_state",
-        path="/auth/google/callback",
-        secure=current_app.config["SESSION_COOKIE_SECURE"],
-        httponly=True,
-        samesite="Lax",
-    )
-    return response
-
-
-@autonix_auth.route("/auth/google/callback")
-def google_callback():
-    decoded_state = _google_state_decode(request.args.get("state", ""))
-    cookie_nonce = request.cookies.get("autonix_google_state", "")
-    if (
-        decoded_state is None
-        or not cookie_nonce
-        or not hmac.compare_digest(decoded_state[0], cookie_nonce)
-    ):
-        flash("Google sign-in expired or could not be verified. Please try again.", "error")
-        return _clear_google_state_cookie(redirect(url_for("autonix_auth.login")))
-    next_url = decoded_state[1]
-    if request.args.get("error"):
-        flash("Google sign-in was cancelled or failed.", "error")
-        return _clear_google_state_cookie(redirect(url_for("autonix_auth.login")))
-    code = request.args.get("code", "")
-    if not code:
-        flash("Google did not return an authorization code.", "error")
-        return _clear_google_state_cookie(redirect(url_for("autonix_auth.login")))
-
-    try:
-        client_id, client_secret, redirect_uri = _google_config()
-        token_data = _google_request(
-            GOOGLE_TOKEN_URL,
-            {
-                "code": code,
-                "client_id": client_id,
-                "client_secret": client_secret,
-                "redirect_uri": redirect_uri,
-                "grant_type": "authorization_code",
-            },
-        )
-        if not isinstance(token_data, dict) or not token_data.get("access_token"):
-            raise ValueError("Google token response did not contain an access token")
-        userinfo = _google_request(
-            GOOGLE_USERINFO_URL, access_token=token_data.get("access_token")
-        )
-        if not isinstance(userinfo, dict):
-            raise ValueError("Google userinfo response was not an object")
-    except (OSError, urllib.error.URLError, ValueError) as exc:
-        current_app.logger.error("Google OAuth exchange failed: %s", exc)
-        flash("Google sign-in could not be completed. Please try again.", "error")
-        return _clear_google_state_cookie(redirect(url_for("autonix_auth.login")))
-
-    email = str(userinfo.get("email") or "").strip().lower()
-    google_id = str(userinfo.get("sub") or "").strip()
-    full_name = str(userinfo.get("name") or "").strip()[:200]
-    email_verified = userinfo.get("email_verified") is True or str(
-        userinfo.get("email_verified", "")
-    ).lower() == "true"
-    if not _valid_email(email) or not google_id or not email_verified:
-        flash("Google did not provide a verified email address.", "error")
-        return _clear_google_state_cookie(redirect(url_for("autonix_auth.login")))
-
-    newly_registered = False
-    connection = _database()
-    try:
-        user = connection.execute(
-            "SELECT id, email, google_id FROM autonix_users WHERE google_id = ?",
-            (google_id,),
-        ).fetchone()
-        if user and user["email"].lower() != email:
-            flash("This Google identity is associated with a different email.", "error")
-            return _clear_google_state_cookie(redirect(url_for("autonix_auth.login")))
-        if not user:
-            user = connection.execute(
-                "SELECT id, email, google_id FROM autonix_users WHERE email = ?",
-                (email,),
-            ).fetchone()
-            if user and user["google_id"] and user["google_id"] != google_id:
-                flash("This email is already linked to another Google identity.", "error")
-                return _clear_google_state_cookie(redirect(url_for("autonix_auth.login")))
-        if user:
-            user_id = user["id"]
-            connection.execute(
-                "UPDATE autonix_users SET google_id = ?, "
-                "auth_provider = CASE WHEN password_hash IS NULL "
-                "THEN 'google' ELSE 'email+google' END, email_verified = 1, "
-                "full_name = ?, last_login = ? WHERE id = ? AND status = 'active'",
-                (google_id, full_name or user["email"], _timestamp(), user_id),
-            )
-            active = connection.execute(
-                "SELECT status FROM autonix_users WHERE id = ?", (user_id,)
-            ).fetchone()
-            if not active or active["status"] != "active":
-                flash("This Autonix account is not active.", "error")
-                return _clear_google_state_cookie(redirect(url_for("autonix_auth.login")))
-        else:
-            user_id = secrets.token_urlsafe(24)
-            created_at = _timestamp()
-            connection.execute(
-                "INSERT INTO autonix_users "
-                "(id, full_name, email, auth_provider, google_id, created_at, "
-                "last_login, email_verified) VALUES (?, ?, ?, 'google', ?, ?, ?, 1)",
-                (
-                    user_id,
-                    full_name or email,
-                    email,
-                    google_id,
-                    created_at,
-                    _timestamp(),
-                ),
-            )
-            newly_registered = True
-        connection.commit()
-    except sqlite3.IntegrityError:
-        connection.rollback()
-        current_app.logger.exception("Google account could not be linked")
-        flash("This Google account could not be linked to Autonix.", "error")
-        return _clear_google_state_cookie(redirect(url_for("autonix_auth.login")))
-    finally:
-        connection.close()
-
-    session["autonix_user_id"] = user_id
-    session.permanent = True
-    session.pop("autonix_csrf_token", None)
-    if newly_registered:
-        try:
-            if not _send_welcome_email(
-                {
-                    "full_name": full_name or email,
-                    "email": email,
-                    "created_at": created_at,
-                }
-            ):
-                flash(
-                    "Your account is ready, but the welcome email could not be sent.",
-                    "warning",
-                )
-        except ValueError as exc:
-            _email_delivery_failed("Welcome", exc)
-            flash(
-                "Your account is ready, but the welcome email could not be sent.",
-                "warning",
-            )
-    else:
-        try:
-            if not _notify_new_login_device(user_id):
-                flash(
-                    "You are signed in, but one or more security emails could not be sent.",
-                    "warning",
-                )
-        except (sqlite3.Error, ValueError):
-            current_app.logger.exception("New-login security notification failed")
-            flash(
-                "You are signed in, but your new-device security email could not be sent.",
-                "warning",
-            )
-    return _clear_google_state_cookie(redirect(_safe_next(next_url)))
 
 
 @autonix_auth.route("/account/logout", methods=["POST"])

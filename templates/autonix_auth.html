@@ -41,7 +41,6 @@
       <label>Confirm password<input name="confirm_password" type="password" autocomplete="new-password" minlength="12" required></label>
       <button type="submit" class="autonix-auth-submit">Create Autonix account</button>
     </form>
-    <a class="autonix-google-button" href="{{ url_for('autonix_auth.google_login', next=next_url) }}">Continue with Google</a>
     <p class="autonix-auth-switch">Already registered? <a href="{{ url_for('autonix_auth.login') }}">Sign in</a></p>
 
     {% elif mode == "forgot" %}
@@ -68,7 +67,6 @@
       <label>Password<input name="password" type="password" autocomplete="current-password" required></label>
       <button type="submit" class="autonix-auth-submit">Sign in</button>
     </form>
-    <a class="autonix-google-button" href="{{ url_for('autonix_auth.google_login', next=next_url) }}">Continue with Google</a>
     <p class="autonix-auth-switch"><a href="{{ url_for('autonix_auth.forgot_password') }}">Forgot password?</a></p>
     <p class="autonix-auth-switch">New to Autonix? <a href="{{ url_for('autonix_auth.register') }}">Create an account</a></p>
     {% endif %}
@@ -84,9 +82,8 @@
   .autonix-auth-form { display: grid; gap: 16px; }
   .autonix-auth-form label { display: grid; gap: 7px; color: #e1e3e8; font-size: 13px; font-weight: 600; }
   .autonix-auth-form input { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid #444854; border-radius: 9px; background: #101218; color: #fff; font: inherit; }
-  .autonix-auth-submit, .autonix-google-button { display: flex; width: 100%; min-height: 46px; align-items: center; justify-content: center; border: 0; border-radius: 9px; font: inherit; font-weight: 700; text-decoration: none; cursor: pointer; }
+  .autonix-auth-submit { display: flex; width: 100%; min-height: 46px; align-items: center; justify-content: center; border: 0; border-radius: 9px; font: inherit; font-weight: 700; text-decoration: none; cursor: pointer; }
   .autonix-auth-submit { margin-top: 4px; background: #00e5a0; color: #07120e; }
-  .autonix-google-button { margin-top: 12px; border: 1px solid #444854; color: #fff; }
   .autonix-auth-switch { margin: 18px 0 0; color: #b7bbc5; font-size: 13px; text-align: center; }
   .autonix-auth-switch a { color: #00e5a0; }
   .autonix-auth-messages { margin: 0 0 18px; }

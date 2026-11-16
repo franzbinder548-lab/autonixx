@@ -72,7 +72,6 @@
     }
 
     @include mobile-or-tablet-screen {
-        .react-flask-header__brand,
         .react-flask-header__notification,
         .react-flask-header__theme-toggle {
             display: none;
@@ -81,6 +80,29 @@
         .react-flask-header__left,
         .react-flask-header__right {
             gap: 0.4rem;
+        }
+
+        .react-flask-header__logo {
+            width: 2.8rem;
+            height: 2.8rem;
+            border-radius: 0.6rem;
+            font-size: 1rem;
+        }
+
+        .react-flask-header__brand {
+            font-size: 1.1rem;
+        }
+
+        .display-currency-switcher {
+            display: none;
+        }
+
+        .auth-actions {
+            gap: 0.4rem;
+
+            button {
+                margin-inline-end: 0;
+            }
         }
     }
 

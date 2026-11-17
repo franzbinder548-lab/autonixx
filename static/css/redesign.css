@@ -2973,23 +2973,6 @@ textarea,
   gap: 10px;
 }
 
-.install-app-download {
-  min-height: 46px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid rgba(255, 255, 255, .28);
-  color: #FFFFFF;
-  text-decoration: none;
-  font-size: 14px;
-  font-weight: 750;
-}
-
-.install-app-download:hover {
-  border-color: var(--color-brand);
-  color: #FFFFFF;
-}
-
 .install-app-close {
   position: absolute;
   top: 12px;
@@ -3020,15 +3003,6 @@ textarea,
 [data-theme="light"] .install-app-close {
   border-color: rgba(0, 0, 0, .12);
   background: rgba(0, 0, 0, .04);
-}
-
-[data-theme="light"] .install-app-download {
-  border-color: rgba(0, 0, 0, .2);
-  color: #000000;
-}
-
-[data-theme="light"] .install-app-download:hover {
-  color: #000000;
 }
 
 @media (min-width: 768px) {
@@ -6451,7 +6425,6 @@ body {
 .autonix-page-wrapper,
 .invest-page-wrapper,
 .terms-page-wrapper,
-.download-app-page,
 .bots-workspace,
 .dash-workspace,
 .autonix-auth-page {

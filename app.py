@@ -154,12 +154,6 @@ def inject_autonix_user():
     }
 
 
-APK_DOWNLOAD_PATH = os.getenv("APK_DOWNLOAD_PATH", "Autonix.apk")
-APK_FILE = (BASE_DIR / APK_DOWNLOAD_PATH).resolve()
-
-if BASE_DIR not in APK_FILE.parents:
-    raise RuntimeError("APK_DOWNLOAD_PATH must point to a file inside the project directory")
-
 # Fail fast at startup if DERIV_APP_ID is missing (required for both flows)
 if not os.getenv("DERIV_APP_ID"):
     raise RuntimeError(
@@ -1269,31 +1263,6 @@ def journal():
     )
 
 
-@app.route("/download-app")
-def download_app():
-    apk_size = APK_FILE.stat().st_size if APK_FILE.is_file() else None
-    return render_template(
-        "download_app.html",
-        deriv_app_id=DERIV_APP_ID,
-        ws_app_id=DERIV_WS_APP_ID,
-        redirect_url=REDIRECT_URL,
-        session_data=_safe_for_template(session.get("user")),
-        apk_available=APK_FILE.is_file(),
-        apk_size=apk_size,
-    )
-
-
-@app.route("/download-app/apk")
-def download_android_apk():
-    if not APK_FILE.is_file():
-        return jsonify({"error": "android_app_unavailable"}), 404
-    return send_file(
-        APK_FILE,
-        mimetype="application/vnd.android.package-archive",
-        as_attachment=True,
-        download_name="Autonix.apk",
-        max_age=0,
-    )
 # ─── OAuth 2.0 + PKCE auth routes ─────────────────────────────────────────────
 
 

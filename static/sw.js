@@ -1,12 +1,11 @@
 /* Autonix service worker */
-const CACHE = "autonix-v10";
+const CACHE = "autonix-v11";
 const PRECACHE = [
   "/",
   "/autonix",
   "/invest",
   "/terms",
   "/bots",
-  "/download-app",
   "/static/css/styles.css",
   "/static/css/tokens.css",
   "/static/css/autonix.css",

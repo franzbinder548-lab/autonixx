@@ -2,17 +2,20 @@
   "use strict";
 
   var INSTALL_ACCEPTED_KEY = "autonix_pwa_installed";
+  var INSTALL_DISMISSED_KEY = "autonix_pwa_prompt_dismissed";
   var FIRST_PROMPT_DELAY = 5000;
-  var REPEAT_PROMPT_DELAY = 30000;
+  var DEFAULT_MESSAGE =
+    "Install Autonix directly from your browser for faster access and a cleaner full-screen workspace.";
+  var MANUAL_INSTALL_MESSAGE =
+    "In Chrome, open the menu and select Install app or Add to Home screen. Other browsers may offer a similar option in their menu.";
 
   var deferredPrompt = null;
   var loadDelayComplete = false;
-  var repeatTimer = null;
 
   var promptEl = document.getElementById("installAppPrompt");
   var installBtn = document.getElementById("installAppBtn");
   var closeBtn = document.getElementById("installAppClose");
-  var downloadBtn = document.getElementById("installAppDownloadBtn");
+  var messageEl = document.getElementById("installAppMessage");
   var legacyInstallBtn = document.querySelector(".install-app-btn");
 
   if (legacyInstallBtn) {
@@ -42,14 +45,29 @@
     return isStandalone() || localStorage.getItem(INSTALL_ACCEPTED_KEY) === "true";
   }
 
+  function isDismissed() {
+    return localStorage.getItem(INSTALL_DISMISSED_KEY) === "true";
+  }
+
   function canShowPrompt() {
     return Boolean(
       promptEl &&
         installBtn &&
-        deferredPrompt &&
         isAndroid() &&
-        !isInstalled(),
+        !isInstalled() &&
+        !isDismissed(),
     );
+  }
+
+  function setInstallMode(hasNativePrompt) {
+    if (messageEl) {
+      messageEl.textContent = hasNativePrompt
+        ? DEFAULT_MESSAGE
+        : MANUAL_INSTALL_MESSAGE;
+    }
+    if (installBtn) {
+      installBtn.textContent = hasNativePrompt ? "Install Web App" : "Got it";
+    }
   }
 
   function hidePrompt() {
@@ -60,31 +78,22 @@
 
   function showPrompt() {
     if (!canShowPrompt()) return;
+    setInstallMode(Boolean(deferredPrompt));
     promptEl.hidden = false;
     window.requestAnimationFrame(function () {
       promptEl.classList.add("is-visible");
     });
   }
 
-  function clearRepeatTimer() {
-    if (!repeatTimer) return;
-    window.clearTimeout(repeatTimer);
-    repeatTimer = null;
-  }
-
-  function scheduleRepeatPrompt() {
-    clearRepeatTimer();
-    if (!canShowPrompt()) return;
-    repeatTimer = window.setTimeout(function () {
-      repeatTimer = null;
-      showPrompt();
-    }, REPEAT_PROMPT_DELAY);
+  function dismissPrompt() {
+    localStorage.setItem(INSTALL_DISMISSED_KEY, "true");
+    hidePrompt();
   }
 
   function markInstalled() {
     localStorage.setItem(INSTALL_ACCEPTED_KEY, "true");
+    localStorage.removeItem(INSTALL_DISMISSED_KEY);
     deferredPrompt = null;
-    clearRepeatTimer();
     hidePrompt();
   }
 
@@ -102,9 +111,10 @@
   });
 
   window.addEventListener("beforeinstallprompt", function (event) {
-    if (!isAndroid() || isInstalled()) return;
+    if (!isAndroid() || isInstalled() || isDismissed()) return;
     event.preventDefault();
     deferredPrompt = event;
+    setInstallMode(true);
     maybeShowInitialPrompt();
   });
 
@@ -112,8 +122,7 @@
 
   if (closeBtn) {
     closeBtn.addEventListener("click", function () {
-      hidePrompt();
-      scheduleRepeatPrompt();
+      dismissPrompt();
     });
   }
 
@@ -121,28 +130,28 @@
     installBtn.addEventListener("click", async function () {
       if (!canShowPrompt()) return;
 
-      hidePrompt();
       var promptEvent = deferredPrompt;
+      if (!promptEvent) {
+        dismissPrompt();
+        return;
+      }
+
+      hidePrompt();
       deferredPrompt = null;
 
-      promptEvent.prompt();
-
       try {
+        promptEvent.prompt();
         var choice = await promptEvent.userChoice;
         if (choice && choice.outcome === "accepted") {
           markInstalled();
           return;
         }
-      } catch (_) {}
-
-      deferredPrompt = null;
-      scheduleRepeatPrompt();
-    });
-  }
-
-  if (downloadBtn) {
-    downloadBtn.addEventListener("click", function () {
-      hidePrompt();
+        dismissPrompt();
+      } catch (error) {
+        console.warn("PWA installation prompt failed:", error);
+        setInstallMode(false);
+        showPrompt();
+      }
     });
   }
 

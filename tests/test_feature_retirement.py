@@ -1,3 +1,4 @@
+import json
 import os
 import sqlite3
 import tempfile
@@ -39,6 +40,32 @@ class FeatureRetirementTests(unittest.TestCase):
             self.client.post("/api/challenge", json={"action": "start"}).status_code,
             404,
         )
+
+    def test_android_app_download_routes_are_removed(self):
+        self.assertEqual(self.client.get("/download-app").status_code, 404)
+        self.assertEqual(self.client.get("/download-app/apk").status_code, 404)
+
+    def test_pwa_assets_remain_available(self):
+        home_page = self.client.get("/")
+        self.assertEqual(home_page.status_code, 200)
+        self.assertIn(b'id="installAppPrompt"', home_page.data)
+        self.assertIn(b'id="installAppBtn"', home_page.data)
+        self.assertNotIn(b"Download Android App", home_page.data)
+
+        manifest_response = self.client.get("/manifest.webmanifest")
+        self.assertEqual(manifest_response.status_code, 200)
+        manifest = json.loads(manifest_response.get_data(as_text=True))
+        self.assertEqual(manifest["display"], "standalone")
+        self.assertTrue(manifest["icons"])
+        for icon in manifest["icons"]:
+            self.assertTrue(
+                (flask_app.BASE_DIR / icon["src"].lstrip("/").replace("/", os.sep)).is_file()
+            )
+
+        service_worker = self.client.get("/sw.js")
+        self.assertEqual(service_worker.status_code, 200)
+        self.assertIn("Service-Worker-Allowed", service_worker.headers)
+        self.assertNotIn("/download-app", service_worker.get_data(as_text=True))
 
     def test_activation_survives_logout_and_login_for_the_same_account(self):
         with patch.dict(os.environ, {"BASIC_BOT_CODES": "basic-only"}):

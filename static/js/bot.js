@@ -891,7 +891,10 @@
     var wins = history.filter(function (t) {
       return Number(t.pl) > 0;
     }).length;
-    var losses = total - wins;
+    var losses = history.filter(function (t) {
+      return Number(t.pl) < 0;
+    }).length;
+    var flat = total - wins - losses;
     var totalPL = history.reduce(function (s, t) {
       return s + (Number(t.pl) || 0);
     }, 0);
@@ -926,7 +929,7 @@
     setText("rpt-win-rate", winRateText);
     setText("rpt-total-trades", total);
     setText("rpt-total-staked", total ? displayMoney(totalSt) : "—");
-    setText("rpt-wins-losses", total ? wins + " / " + losses : "—");
+    setText("rpt-wins-losses", total ? wins + " / " + losses + " / " + flat : "—");
     setText("rpt-best-trade", total ? displaySignedMoney(best) : "—");
     setText("rpt-count", total + " trade" + (total !== 1 ? "s" : ""));
     setDashboardStat("total-pl", plText);
@@ -964,7 +967,7 @@
     var rows = history
       .slice(0, isDashboard ? 5 : 200)
       .map(function (t) {
-        var plClass = Number(t.pl) >= 0 ? "pl-profit" : "pl-loss";
+        var plClass = Number(t.pl) > 0 ? "pl-profit" : (Number(t.pl) < 0 ? "pl-loss" : "pl-flat");
         var plStr = displaySignedMoney(t.pl);
         return (
           "<tr>" +

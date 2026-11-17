@@ -1,7 +1,4 @@
 # Dependencies
 node_modules/
 __pycache__/
-*.py[cod]
-.env
 .env.production
-data/autonix_challenges.sqlite3*

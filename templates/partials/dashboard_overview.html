@@ -9,21 +9,6 @@
       <span class="ad-connection-status {% if deriv_connected %}is-connected{% else %}is-disconnected{% endif %}">
         <span aria-hidden="true"></span>{{ 'Deriv connected' if deriv_connected else 'Deriv not connected' }}
       </span>
-      <details class="ad-profile-menu">
-        <summary>
-          <span class="ad-avatar" aria-hidden="true">{{ autonix_user.full_name[:1]|upper }}</span>
-          <span><strong>{{ autonix_user.full_name }}</strong><small>Autonix account</small></span>
-          <span class="ad-profile-chevron" aria-hidden="true">⌄</span>
-        </summary>
-        <div class="ad-profile-popover">
-          <span>{{ autonix_user.email }}</span>
-          <a href="#account-profile">Manage profile</a>
-          <form method="post" action="{{ url_for('autonix_auth.logout') }}">
-            <input type="hidden" name="csrf_token" value="{{ autonix_csrf_token }}">
-            <button type="submit">Log out of Autonix</button>
-          </form>
-        </div>
-      </details>
     </div>
   </header>
 
@@ -88,7 +73,7 @@
         <span class="ad-eyebrow">ACCOUNT PERFORMANCE</span>
         <h2 id="ad-performance-overview-heading">Trading at a glance</h2>
       </div>
-      <span class="ad-section-note">Based on recorded trades for the selected Deriv account</span>
+      <span class="ad-section-note">Based on locally recorded trades linked to the selected Deriv account</span>
     </div>
     <div class="ad-trading-stats-grid">
       <article class="ad-trading-stat-card">

@@ -44,5 +44,16 @@
     }
   }
 
-  window.AutonixTradeActivity = { load: load, record: record };
+  function clear() {
+    try {
+      localStorage.removeItem(getStorageKey());
+      window.dispatchEvent(new CustomEvent("autonixTradeActivityUpdated"));
+      return true;
+    } catch (error) {
+      console.error("Unable to clear Autonix trade history.", error);
+      return false;
+    }
+  }
+
+  window.AutonixTradeActivity = { load: load, record: record, clear: clear };
 })();

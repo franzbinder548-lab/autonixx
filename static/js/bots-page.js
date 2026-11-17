@@ -2368,7 +2368,24 @@
   }
 
   /* ─── Global history ─────────────────────────────────────────── */
-  var globalHistory = [];
+  function loadGlobalHistory() {
+    if (!window.AutonixTradeActivity) return [];
+    return window.AutonixTradeActivity.load().map(function (trade) {
+      trade = trade && typeof trade === "object" ? trade : {};
+      var pl = Number(trade.pl) || 0;
+      return {
+        botId: "",
+        botName: String(trade.type || "Trade"),
+        tradeType: String(trade.selection || "—"),
+        stake: Number(trade.stake) || 0,
+        pl: pl,
+        time: String(trade.time || "—"),
+        won: pl > 0,
+        flat: pl === 0,
+      };
+    });
+  }
+  var globalHistory = loadGlobalHistory();
   function pushGlobalHistory(entry) {
     globalHistory.unshift(entry);
     if (globalHistory.length > 500) globalHistory.length = 500;
@@ -2400,18 +2417,33 @@
     if (tableWrap) tableWrap.style.display = "";
     var ACCENT = { freeBot: "#00E5A0", basicBot: "#5b9dff" };
     tbody.innerHTML = globalHistory.slice(0, 200).map(function (h) {
+      var pl = Number(h.pl) || 0;
+      var outcome = h.flat || pl === 0 ? "FLAT" : (h.won ? "WIN" : "LOSS");
+      var outcomeClass = outcome === "WIN" ? "h-win" : (outcome === "FLAT" ? "h-flat-badge" : "h-loss-badge");
+      var rowClass = outcome === "WIN" ? "hrow-win" : (outcome === "FLAT" ? "hrow-flat" : "hrow-loss");
+      var botId = String(h.botId || "");
+      var accent = Object.prototype.hasOwnProperty.call(ACCENT, botId) ? ACCENT[botId] : "#aaa";
       var plStr = displaySignedMoney(h.pl);
       return (
-        '<tr class="' + (h.won ? "hrow-win" : "hrow-loss") + '">' +
-        '<td><span class="h-bot-dot" style="background:' + (ACCENT[h.botId] || "#aaa") + '"></span>' + h.botName + '</td>' +
-        '<td>' + h.tradeType + '</td>' +
+        '<tr class="' + rowClass + '">' +
+        '<td><span class="h-bot-dot" style="background:' + accent + '"></span>' + escapeHistoryText(h.botName) + '</td>' +
+        '<td>' + escapeHistoryText(h.tradeType) + '</td>' +
         '<td>' + displayMoney(h.stake) + '</td>' +
-        '<td><span class="h-result-badge ' + (h.won ? "h-win" : "h-loss-badge") + '">' + (h.won ? "WIN" : "LOSS") + '</span></td>' +
-        '<td class="' + (h.pl >= 0 ? "h-profit" : "h-loss") + '">' + plStr + '</td>' +
-        '<td class="h-time">' + h.time + '</td>' +
+        '<td><span class="h-result-badge ' + outcomeClass + '">' + outcome + '</span></td>' +
+        '<td class="' + (pl > 0 ? "h-profit" : (pl < 0 ? "h-loss" : "h-flat")) + '">' + plStr + '</td>' +
+        '<td class="h-time">' + escapeHistoryText(h.time) + '</td>' +
         '</tr>'
       );
     }).join("");
+  }
+
+  function escapeHistoryText(value) {
+    return String(value == null ? "" : value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
   }
 
   /* ─── Initial render ─────────────────────────────────────────── */
@@ -2441,6 +2473,11 @@
     if (clearBtn && !clearBtn._wired) {
       clearBtn._wired = true;
       clearBtn.addEventListener("click", function () {
+        if (!window.confirm("Clear all saved Autonix trade history from this browser? This cannot be undone.")) return;
+        if (window.AutonixTradeActivity && !window.AutonixTradeActivity.clear()) {
+          window.showToast && window.showToast("Trade history could not be cleared.", "red", 2200);
+          return;
+        }
         globalHistory = [];
         renderHistoryCard();
         window.showToast && window.showToast("Trade history cleared", "neutral", 1800);

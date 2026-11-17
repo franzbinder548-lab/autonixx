@@ -7136,6 +7136,28 @@ html:has(.autonix-auth-page) {
   line-height: 1.5;
 }
 
+.reports-table .pl-flat {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.bots-history-table .hrow-flat {
+  background: rgba(255, 255, 255, .015);
+}
+
+.bots-history-table .h-flat,
+.bots-history-table .h-flat-badge {
+  color: var(--text-muted);
+}
+
+.bots-history-table .h-flat {
+  font-weight: 600;
+}
+
+.bots-history-table .h-flat-badge {
+  background: rgba(255, 255, 255, .08);
+}
+
 .dashboard-app .ad-account-management {
   padding-top: 3px;
 }
@@ -7152,6 +7174,11 @@ html:has(.autonix-auth-page) {
 
 .dashboard-app .ad-wallet-section .dash-section-heading-row {
   margin-bottom: 12px;
+}
+
+.dashboard-app .dash-transfer-trigger,
+.dash-modal .nav-btn {
+  display: inline-flex;
 }
 
 .dashboard-app .ad-security-panel p {

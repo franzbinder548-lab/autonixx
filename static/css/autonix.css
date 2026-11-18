@@ -2690,20 +2690,6 @@ html:has(.terms-page-wrapper) {
   overflow: visible !important;
 }
 
-/* Footer AT logo badge (matches trading page style) */
-.footer-at-logo {
-  width: 48px !important;
-  height: 48px !important;
-  border-radius: 10px !important;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.footer-at-logo span {
-  font-size: 16px !important;
-}
-
 .footer-brand {
   display: flex;
   align-items: center;

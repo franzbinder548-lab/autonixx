@@ -50,6 +50,9 @@ class FeatureRetirementTests(unittest.TestCase):
         self.assertEqual(home_page.status_code, 200)
         self.assertIn(b'id="installAppPrompt"', home_page.data)
         self.assertIn(b'id="installAppBtn"', home_page.data)
+        self.assertIn(b"autonix-icon-192.png", home_page.data)
+        self.assertIn(b"autonix-favicon-32.png", home_page.data)
+        self.assertNotIn(b">AT</span>", home_page.data)
         self.assertNotIn(b"Download Android App", home_page.data)
 
         manifest_response = self.client.get("/manifest.webmanifest")

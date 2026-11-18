@@ -38,7 +38,7 @@ describe('LogoMark', () => {
         expect(screen.getByRole('img')).toHaveAttribute('src', '/logo.png');
     });
 
-    it('falls back to the letter badge after every logo candidate fails', () => {
+    it('falls back to the Autonix icon after every logo candidate fails', () => {
         render(<LogoMark />);
         // Candidates: /logo.png, /logo.jpg, /logo.jpeg, /logo.webp — error through all.
         for (let i = 0; i < 4; i++) {
@@ -46,19 +46,16 @@ describe('LogoMark', () => {
             if (!img) break;
             fireEvent.error(img);
         }
-        expect(screen.queryByRole('img')).not.toBeInTheDocument();
-        // Letter badge shows the first letter of the app name.
-        expect(screen.getByText('D')).toBeInTheDocument();
+        expect(screen.getByRole('img')).toHaveAttribute('src', '/static/icons/autonix-icon-192.png');
     });
 
-    it('skips logo file probing in the preview build and renders the letter badge', () => {
+    it('skips logo file probing in the preview build and renders the Autonix icon', () => {
         // The static preview build (NEXT_PUBLIC_APP_BUILD=true) ships no public/logo.*; the
         // live App Builder logo arrives as a data URL via PREVIEW_BRANDING. With no live logo
-        // yet, there should be no <img> probe (which would 404) — only the badge fallback.
+        // yet, there should be no file probe (which would 404) — only the Autonix icon.
         process.env.NEXT_PUBLIC_APP_BUILD = 'true';
         render(<LogoMark />);
-        expect(screen.queryByRole('img')).not.toBeInTheDocument();
-        expect(screen.getByText('D')).toBeInTheDocument();
+        expect(screen.getByRole('img')).toHaveAttribute('src', '/static/icons/autonix-icon-192.png');
     });
 
     it('hides the name text when preview showAppName is false', () => {
@@ -77,21 +74,19 @@ describe('LogoMark', () => {
         });
     });
 
-    it('renders only the letter badge when brand.config.json records no logo (logo_path: null)', () => {
+    it('renders the Autonix icon when brand.config.json records no logo (logo_path: null)', () => {
         mockLogoCandidates = [];
         render(<LogoMark />);
-        // The BFF said no logo ships — no <img> probe (which would 404), only the badge.
-        expect(screen.queryByRole('img')).not.toBeInTheDocument();
-        expect(screen.getByText('D')).toBeInTheDocument();
+        // The BFF said no partner logo ships — use the Autonix icon.
+        expect(screen.getByRole('img')).toHaveAttribute('src', '/static/icons/autonix-icon-192.png');
     });
 
     it('renders exactly the recorded logo_path when the BFF wrote one', () => {
         mockLogoCandidates = ['/logo.webp'];
         render(<LogoMark />);
         expect(screen.getByRole('img')).toHaveAttribute('src', '/logo.webp');
-        // A failed load falls straight to the badge — no other extensions to guess.
+        // A failed partner logo falls straight to the Autonix icon — no other extensions to guess.
         fireEvent.error(screen.getByRole('img'));
-        expect(screen.queryByRole('img')).not.toBeInTheDocument();
-        expect(screen.getByText('D')).toBeInTheDocument();
+        expect(screen.getByRole('img')).toHaveAttribute('src', '/static/icons/autonix-icon-192.png');
     });
 });

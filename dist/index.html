@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" dir="auto" class="light" data-theme="light">
+<html lang="en" dir="auto" class="dark" data-theme="dark">
     <head>
         <!-- Google Tag Manager -->
         <script>
@@ -17,7 +17,7 @@
         <!-- End Google Tag Manager -->
 
         <meta charset="UTF-8" />
-        <link rel="icon" type="image/svg+xml" href="/ATDbot/deriv-logo.svg" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/autonix-favicon-32.png" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
         <meta name="title" content="Automate Your Trades | Deriv Bot" />
         <meta
@@ -32,14 +32,7 @@
         <title>Automate Your Trades | Deriv Bot</title>
         <script>
             (function () {
-                var theme = localStorage.getItem('at_theme');
-                if (theme !== 'light' && theme !== 'dark') {
-                    theme = localStorage.getItem('theme');
-                    if (theme === 'light' || theme === 'dark') {
-                        localStorage.setItem('at_theme', theme);
-                    }
-                }
-                theme = theme === 'dark' ? 'dark' : 'light';
+                var theme = 'dark';
                 document.documentElement.setAttribute('data-theme', theme);
                 document.addEventListener('DOMContentLoaded', function () {
                     document.body.classList.remove('theme--light', 'theme--dark');
@@ -52,9 +45,9 @@
                 font-size: 62.5%;
             }
         </style>
-    <script defer src="/ATDbot/static/js/lib-react.28b70b7c.js"></script><script defer src="/ATDbot/static/js/lib-router.8fa46235.js"></script><script defer src="/ATDbot/static/js/944.cef756cc.js"></script><script defer src="/ATDbot/static/js/index.3dc95ded.js"></script><link href="/ATDbot/static/css/944.94640a0a.css" rel="stylesheet"><link href="/ATDbot/static/css/index.be4e81ba.css" rel="stylesheet"></head>
+    <script defer src="/ATDbot/static/js/lib-react.28b70b7c.js"></script><script defer src="/ATDbot/static/js/lib-router.8fa46235.js"></script><script defer src="/ATDbot/static/js/944.cef756cc.js"></script><script defer src="/ATDbot/static/js/index.959aa103.js"></script><link href="/ATDbot/static/css/944.94640a0a.css" rel="stylesheet"><link href="/ATDbot/static/css/index.007d5cc0.css" rel="stylesheet"></head>
 
-    <body class="body theme theme--light">
+    <body class="body theme theme--dark">
         <!-- Google Tag Manager (noscript) -->
         <noscript
             ><iframe

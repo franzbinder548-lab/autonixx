@@ -22,20 +22,6 @@
         object-fit: contain;
     }
 
-    // Letter-badge fallback shown when no logo file/data URL is available.
-    &__logo-badge {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex: none;
-        border-radius: 0.8rem;
-        background: color-mix(in srgb, var(--brand-primary, var(--text-general)) 10%, transparent);
-        color: var(--brand-primary, var(--text-general));
-        font-weight: 700;
-        font-size: 1.4rem;
-        line-height: 1;
-    }
-
     &__logo-text {
         margin-left: 1.2rem;
         color: var(--text-general);

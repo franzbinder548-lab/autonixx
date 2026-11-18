@@ -67,7 +67,7 @@ describe('applyFaviconFromLogo', () => {
         });
     });
 
-    it('sets the letter badge without probing when brand.config.json records no logo (logo_path: null)', () => {
+    it('sets the Autonix favicon without probing when no logo is configured', () => {
         jest.isolateModules(() => {
             jest.doMock('../is-preview-mode', () => ({ isPreviewMode: () => false }));
             jest.doMock('../../../brand.config.json', () => ({
@@ -78,11 +78,10 @@ describe('applyFaviconFromLogo', () => {
 
             applyFaviconFromLogo();
 
-            // The BFF said no logo ships — no candidate may be requested (no 404 noise)…
+            // The BFF said no partner logo ships — no candidate may be requested (no 404 noise)…
             expect(imageProbeCount).toBe(0);
-            // …and the letter badge takes over directly.
             const link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
-            expect(link?.href).toMatch(/^data:image\/svg\+xml;base64,/);
+            expect(link?.getAttribute('href')).toBe('/static/icons/autonix-favicon-32.png');
         });
     });
 
@@ -102,7 +101,7 @@ describe('applyFaviconFromLogo', () => {
         });
     });
 
-    it('sets the letter-badge favicon without probing in the preview build', () => {
+    it('sets the Autonix favicon without probing in the preview build', () => {
         jest.isolateModules(() => {
             jest.doMock('../is-preview-mode', () => ({ isPreviewMode: () => true }));
             jest.doMock('../../../brand.config.json', () => ({
@@ -115,14 +114,12 @@ describe('applyFaviconFromLogo', () => {
 
             // The preview build ships no public/logo.*, so it must not probe files…
             expect(imageProbeCount).toBe(0);
-            // …but it must still show the letter badge rather than the deriv default.
             const link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
-            expect(link?.href).toMatch(/^data:image\/svg\+xml;base64,/);
-            expect(atob(link!.href.replace('data:image/svg+xml;base64,', ''))).toContain('>Q</text>');
+            expect(link?.getAttribute('href')).toBe('/static/icons/autonix-favicon-32.png');
         });
     });
 
-    it('falls back to a letter-badge SVG favicon when no logo candidate loads', () => {
+    it('falls back to the Autonix favicon when no logo candidate loads', () => {
         // Stub Image so every probed candidate fails — drives the chain to exhaustion.
         // @ts-expect-error - partial stub is enough for the failing-probe path under test.
         global.Image = class {
@@ -144,10 +141,7 @@ describe('applyFaviconFromLogo', () => {
             applyFaviconFromLogo();
 
             const link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
-            expect(link?.href).toMatch(/^data:image\/svg\+xml;base64,/);
-            const svg = atob(link!.href.replace('data:image/svg+xml;base64,', ''));
-            expect(svg).toContain('>Z</text>');
-            expect(svg).toContain('#3b82f6');
+            expect(link?.getAttribute('href')).toBe('/static/icons/autonix-favicon-32.png');
         });
     });
 });

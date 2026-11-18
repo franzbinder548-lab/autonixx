@@ -208,7 +208,7 @@ const AppHeader = observer(() => {
                         <MobileMenu onLogout={handleLogout} />
                     )}
                     <a href='/' className='react-flask-header__logo' aria-label='Autonix home'>
-                        <span>AT</span>
+                        <img src='/static/icons/autonix-icon-192.png' alt='' />
                     </a>
                     <span className='react-flask-header__brand'>Autonix Trading</span>
                 </Wrapper>

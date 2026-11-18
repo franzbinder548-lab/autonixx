@@ -1,5 +1,5 @@
 /* Autonix service worker */
-const CACHE = "autonix-v11";
+const CACHE = "autonix-v12";
 const PRECACHE = [
   "/",
   "/autonix",
@@ -17,8 +17,11 @@ const PRECACHE = [
   "/static/js/bot.js",
   "/static/js/deriv-ws.js",
   "/static/js/theme-toggle.js",
-  "/static/icons/icon-192x192.png",
-  "/static/icons/icon-512x512.png",
+  "/static/icons/autonix-logo-full.png",
+  "/static/icons/autonix-favicon-32.png",
+  "/static/icons/autonix-apple-touch-icon-180.png",
+  "/static/icons/autonix-icon-192.png",
+  "/static/icons/autonix-icon-512.png",
   "/static/manifest.webmanifest",
 ];
 

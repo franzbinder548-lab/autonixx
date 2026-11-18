@@ -85,40 +85,6 @@ svg {
   flex-shrink: 0;
 }
 
-.at-logo {
-  width: 30px;
-  height: 30px;
-  background: linear-gradient(135deg, var(--color-green), var(--color-green-dim));
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  box-shadow: 0 0 12px var(--color-green-glow);
-  border: none;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.at-logo:hover {
-  box-shadow: 0 0 16px var(--color-green-glow);
-  transform: scale(1.05);
-}
-
-.at-logo span {
-  font-size: 10px;
-  font-weight: 800;
-  color: #000;
-  letter-spacing: -.5px;
-}
-
-@media (max-width: 767px) {
-  .at-logo {
-    width: 36px;
-    height: 36px;
-  }
-}
-
 .nav-brand {
   font-size: 13px;
   font-weight: 700;
@@ -4264,7 +4230,6 @@ body.drawer-open {
     min-width: 0;
   }
 
-  .at-logo,
   .nav-icon-btn,
   .mobile-menu-btn,
   .theme-toggle {
@@ -5073,23 +5038,6 @@ video {
   body:has(#trade-panel) .nav-right {
     min-width: 0;
     align-items: center;
-  }
-
-  body:has(#trade-panel) .at-logo {
-    width: 44px !important;
-    height: 44px !important;
-    min-width: 44px !important;
-    min-height: 44px !important;
-    flex: 0 0 44px;
-    border-radius: .65rem !important;
-    padding: 0 !important;
-  }
-
-  body:has(#trade-panel) .at-logo span {
-    display: block;
-    font-size: .82rem !important;
-    line-height: 1 !important;
-    letter-spacing: 0 !important;
   }
 
   body:has(#trade-panel) .account-chip {

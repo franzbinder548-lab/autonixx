@@ -369,6 +369,8 @@ class AutonixAuthTests(unittest.TestCase):
         self.assertIn(b">Dashboard</a>", response.data)
         self.assertIn(b"Account settings", response.data)
         self.assertIn(b"Log out of Autonix", response.data)
+        self.assertNotIn(b'id="demoBtn"', response.data)
+        self.assertNotIn(b'id="goToTradeBtn"', response.data)
         self.assertNotIn(b">My account</a>", response.data)
         self.assertNotIn(b"class=\"nav-btn nav-btn-ghost\">Connect Deriv", response.data)
 

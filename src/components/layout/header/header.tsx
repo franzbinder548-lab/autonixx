@@ -193,11 +193,13 @@ const AppHeader = observer(() => {
                 })}
             >
                 <Wrapper variant='left' className='react-flask-header__left'>
-                    {renderAccountSection()}
+                    <a href='/' className='react-flask-header__logo' aria-label='Autonix home'>
+                        <img src='/static/icons/autonix-icon-192.png' alt='' />
+                    </a>
+                    <span className='react-flask-header__brand'>Autonix Trading</span>
                     {isDesktop && <MenuItems />}
                 </Wrapper>
                 <Wrapper variant='right' className='react-flask-header__right'>
-                    {enableThemeToggle && <ChangeTheme />}
                     {isDesktop ? (
                         <button className='react-flask-header__notification' type='button' aria-label='Notifications' title='Notifications'>
                             <svg width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2' aria-hidden='true'>
@@ -207,10 +209,8 @@ const AppHeader = observer(() => {
                     ) : (
                         <MobileMenu onLogout={handleLogout} />
                     )}
-                    <a href='/' className='react-flask-header__logo' aria-label='Autonix home'>
-                        <img src='/static/icons/autonix-icon-192.png' alt='' />
-                    </a>
-                    <span className='react-flask-header__brand'>Autonix Trading</span>
+                    {enableThemeToggle && <ChangeTheme />}
+                    {renderAccountSection()}
                 </Wrapper>
             </Header>
         </>

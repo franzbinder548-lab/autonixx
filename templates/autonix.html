@@ -67,6 +67,7 @@
                 </div>
 
                 <div class="hero-ctas">
+                    {% if not autonix_user %}
                     <a href="/register" class="cta-primary" id="demoBtn">
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"/></svg>
                         Create Autonix Account
@@ -74,6 +75,7 @@
                     <a href="/login" class="cta-secondary" id="goToTradeBtn">
                         Log In
                     </a>
+                    {% endif %}
                 </div>
 
                 <div class="hero-trust-badges" aria-label="Trust indicators">

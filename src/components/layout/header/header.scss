@@ -17,11 +17,14 @@
     }
 
     .react-flask-header__left {
+        flex: 1 1 0;
         gap: 0.8rem;
     }
 
     .react-flask-header__right {
+        flex: 0 0 auto;
         gap: 0.8rem;
+        margin-inline-start: auto;
     }
 
     .react-flask-header__logo {

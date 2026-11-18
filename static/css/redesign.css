@@ -4531,6 +4531,25 @@ textarea,
   background: rgba(8,8,16,.94);
   box-shadow: 0 4px 32px rgba(0,0,0,.4);
 }
+
+.invest-page-wrapper > .autonix-navbar,
+.journal-page-wrapper > .autonix-navbar {
+  position: fixed !important;
+  top: 0;
+  left: 0;
+  right: 0;
+}
+
+.journal-page-wrapper {
+  padding-top: 70px;
+}
+
+@media (max-width: 480px) {
+  .journal-page-wrapper {
+    padding-top: 60px;
+  }
+}
+
 .navbar-container {
   max-width: 1280px;
   margin: 0 auto;

@@ -351,4 +351,15 @@ document.addEventListener("derivBalance", function (e) {
   initLiveChart();
 })();
 </script>
+{% if deriv_connected and session_data and session_data.isAuthenticated %}
+<script>
+  fetch("/api/deriv-accounts/refresh", {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "X-CSRF-Token": {{ autonix_csrf_token|tojson }} }
+  }).catch(function (error) {
+    console.warn("Deriv account balance sync could not be completed.", error);
+  });
+</script>
+{% endif %}
 {% endblock %}

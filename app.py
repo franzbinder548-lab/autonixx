@@ -10,6 +10,7 @@ import urllib.request
 import urllib.error
 import urllib.parse
 import uuid
+from functools import wraps
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -31,8 +32,10 @@ from autonix_auth import (
     autonix_auth,
     get_autonix_csrf_token,
     get_current_autonix_user,
+    get_deriv_account_snapshots,
     link_deriv_accounts,
     set_deriv_connection,
+    update_deriv_account_snapshots,
 )
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -1251,6 +1254,23 @@ def dashboard():
     return response
 
 
+@app.route("/api/deriv-accounts/refresh", methods=["POST"])
+def refresh_deriv_account_snapshots_api():
+    expected_csrf = session.get("autonix_csrf_token", "")
+    supplied_csrf = request.headers.get("X-CSRF-Token", "")
+    if not expected_csrf or not supplied_csrf or not hmac.compare_digest(expected_csrf, supplied_csrf):
+        return jsonify({"error": "csrf_validation_failed"}), 400
+    user = session.get("user")
+    if not isinstance(user, dict) or user.get("isAuthenticated") is not True:
+        return jsonify({"error": "deriv_authentication_required"}), 401
+    autonix_user_id = session.get("autonix_user_id")
+    token = user.get("_accessToken")
+    if not autonix_user_id or not token:
+        return jsonify({"error": "linked_deriv_session_required"}), 409
+    _refresh_session_account_balances(user, token)
+    return jsonify({"success": True})
+
+
 @app.route("/journal")
 def journal():
     user = session.get("user")
@@ -1477,12 +1497,19 @@ def _refresh_session_account_balances(user, token):
         account_id = row.get("account_id") or row.get("account") or row.get("loginid")
         if account_id:
             refreshed[str(account_id)] = row
+    snapshot_accounts = []
     for account in user.get("accounts", []):
         current = refreshed.get(str(account.get("account")))
         if current is not None and current.get("balance") is not None:
             account["balance"] = current["balance"]
             if current.get("currency"):
                 account["currency"] = str(current["currency"]).upper()
+            snapshot_accounts.append({
+                "account": str(account.get("account")),
+                "accountType": account.get("accountType"),
+                "currency": current.get("currency"),
+                "balance": current["balance"],
+            })
     active = user.get("activeAccount") or {}
     active_refreshed = refreshed.get(str(active.get("account")))
     if active_refreshed is not None and active_refreshed.get("balance") is not None:
@@ -1492,6 +1519,9 @@ def _refresh_session_account_balances(user, token):
     user["activeAccount"] = active
     session["user"] = user
     session.modified = True
+    user_id = session.get("autonix_user_id")
+    if user_id and snapshot_accounts:
+        update_deriv_account_snapshots(user_id, snapshot_accounts)
 
 
 def _wallet_transfer_options(token, user):
@@ -2033,6 +2063,32 @@ def place_trade():
                 "message": "Stake must be between 0.35 and 50000",
             }
         ), 400
+    autonix_user = get_current_autonix_user()
+    active_account = (user.get("activeAccount") or {}) if isinstance(user, dict) else {}
+    record_id = str(uuid.uuid4())
+    trade_db = _admin_database()
+    try:
+        trade_db.execute(
+            "INSERT INTO trade_records "
+            "(id, user_id, deriv_account_id, bot_id, symbol, contract_type, direction, "
+            "stake, currency, status, executed_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)",
+            (
+                record_id,
+                autonix_user.get("id") if autonix_user else None,
+                str(active_account.get("account") or ""),
+                str(data.get("bot_id") or data.get("bot") or ""),
+                str(symbol),
+                str(contract_type),
+                str(selection),
+                stake,
+                display_currency,
+                _utc_timestamp(),
+            ),
+        )
+        trade_db.commit()
+    finally:
+        trade_db.close()
     return jsonify(
         {
             "success": True,
@@ -2500,6 +2556,663 @@ def revoke_activation():
     if not result.rowcount:
         return jsonify({"error": "Active activation not found"}), 404
     return jsonify({"revoked": True, "account_id": account_id, "tier": tier})
+
+
+# ─── Administration dashboard ────────────────────────────────────────────────
+
+def _auth_database_path():
+    configured = os.getenv("AUTONIX_AUTH_DATABASE_PATH", "").strip()
+    if not configured:
+        return BASE_DIR / "data" / "autonix_users.sqlite3"
+    path = Path(configured)
+    return path if path.is_absolute() else BASE_DIR / path
+
+
+def _admin_database_path():
+    configured = os.getenv("AUTONIX_ADMIN_DATABASE_PATH", "").strip()
+    if not configured:
+        return BASE_DIR / "data" / "autonix_admin.sqlite3"
+    path = Path(configured)
+    return path if path.is_absolute() else BASE_DIR / path
+
+
+def _admin_database():
+    path = _admin_database_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    connection = sqlite3.connect(path, timeout=10)
+    connection.row_factory = sqlite3.Row
+    connection.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS admin_accounts (
+            id TEXT PRIMARY KEY,
+            username TEXT NOT NULL UNIQUE,
+            password_hash TEXT NOT NULL,
+            role TEXT NOT NULL DEFAULT 'administrator',
+            permissions TEXT NOT NULL DEFAULT '[]',
+            active INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL,
+            last_login TEXT
+        );
+        CREATE TABLE IF NOT EXISTS admin_audit (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            administrator TEXT NOT NULL,
+            action TEXT NOT NULL,
+            resource_type TEXT,
+            resource_id TEXT,
+            details TEXT,
+            outcome TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS admin_notifications (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            message TEXT NOT NULL,
+            category TEXT NOT NULL DEFAULT 'announcement',
+            audience TEXT NOT NULL DEFAULT 'all',
+            status TEXT NOT NULL DEFAULT 'published',
+            created_by TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            published_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS trade_records (
+            id TEXT PRIMARY KEY,
+            user_id TEXT,
+            deriv_account_id TEXT,
+            bot_id TEXT,
+            symbol TEXT,
+            contract_type TEXT,
+            direction TEXT,
+            stake REAL,
+            currency TEXT NOT NULL DEFAULT 'USD',
+            status TEXT NOT NULL DEFAULT 'pending',
+            result TEXT,
+            profit REAL,
+            executed_at TEXT NOT NULL
+        );
+        """
+    )
+    # A permissions typo-safe migration for older SQLite-created databases.
+    columns = {row["name"] for row in connection.execute("PRAGMA table_info(admin_accounts)")}
+    if "permissions" not in columns:
+        connection.execute("ALTER TABLE admin_accounts ADD COLUMN permissions TEXT NOT NULL DEFAULT '[]'")
+    connection.commit()
+    return connection
+
+
+def _admin_credentials():
+    username = (
+        os.getenv("ADMIN_USERNAME")
+        or os.getenv("ADIMIN_USERNAME")
+        or os.getenv("AUTONIX_ADMIN_USERNAME")
+        or ""
+    ).strip()
+    password = (
+        os.getenv("ADMIN_PASSWORD")
+        or os.getenv("ADIMIN_PASSWORD")
+        or os.getenv("AUTONIX_ADMIN_PASSWORD")
+        or ""
+    )
+    return username, password
+
+
+def _admin_password_hash(password):
+    salt = secrets.token_bytes(16)
+    derived = hashlib.scrypt(password.encode("utf-8"), salt=salt, n=2**14, r=8, p=1, dklen=64)
+    return f"scrypt${salt.hex()}${derived.hex()}"
+
+
+def _admin_password_matches(password, encoded):
+    try:
+        algorithm, salt_hex, digest_hex = encoded.split("$", 2)
+        if algorithm != "scrypt":
+            return False
+        actual = hashlib.scrypt(
+            password.encode("utf-8"),
+            salt=bytes.fromhex(salt_hex),
+            n=2**14,
+            r=8,
+            p=1,
+            dklen=64,
+        )
+        return hmac.compare_digest(actual.hex(), digest_hex)
+    except (ValueError, TypeError):
+        return False
+
+
+def _admin_identity():
+    admin = session.get("autonix_admin")
+    if not isinstance(admin, dict):
+        return None
+    if admin.get("role") == "owner":
+        return admin
+    connection = _admin_database()
+    try:
+        row = connection.execute(
+            "SELECT id, username, role, permissions, active FROM admin_accounts WHERE id = ?",
+            (admin.get("id"),),
+        ).fetchone()
+    finally:
+        connection.close()
+    if not row or not row["active"]:
+        return None
+    permissions = []
+    try:
+        permissions = json.loads(row["permissions"] or "[]")
+    except json.JSONDecodeError:
+        permissions = []
+    return {
+        "id": row["id"],
+        "username": row["username"],
+        "role": row["role"],
+        "permissions": permissions,
+    }
+
+
+def _admin_audit(admin, action, resource_type=None, resource_id=None, details=None, outcome="success"):
+    connection = _admin_database()
+    try:
+        connection.execute(
+            "INSERT INTO admin_audit "
+            "(administrator, action, resource_type, resource_id, details, outcome, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (
+                admin.get("username", "unknown"),
+                action,
+                resource_type,
+                str(resource_id) if resource_id is not None else None,
+                json.dumps(details or {}, sort_keys=True) if isinstance(details, dict) else details,
+                outcome,
+                _utc_timestamp(),
+            ),
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+
+def _admin_required(permission=None):
+    def decorator(view):
+        @wraps(view)
+        def wrapped(*args, **kwargs):
+            admin = _admin_identity()
+            if not admin:
+                return jsonify({"error": "administrator_authentication_required"}), 401
+            if admin["role"] != "owner" and permission and permission not in admin.get("permissions", []):
+                return jsonify({"error": "forbidden"}), 403
+            return view(admin, *args, **kwargs)
+        return wrapped
+    return decorator
+
+
+def _masked_deriv_account(account_id):
+    text = str(account_id or "").strip()
+    if len(text) <= 4:
+        return "*" * len(text)
+    return f"{text[:2]}{'*' * max(3, len(text) - 4)}{text[-2:]}"
+
+
+def _admin_bot_catalog():
+    return [
+        {"id": "over1AiPredictor", "name": "Expert Bot", "type": "Expert", "access": "Expert activation required"},
+        {"id": "freeBot", "name": "Free Bot", "type": "Free", "access": "Free access"},
+        {"id": "bulkTrader", "name": "Bulk Trader", "type": "Multi Trade", "access": "Open Bulk Trader in the Bots workspace"},
+        {"id": "basicBot", "name": "Basic Bot", "type": "Basic", "access": "Basic activation required"},
+    ]
+
+
+@app.route("/admin", methods=["GET"])
+def admin_page():
+    if not _admin_identity():
+        return render_template("admin_login.html")
+    return render_template("admin.html", administrator=_admin_identity())
+
+
+@app.route("/admin/login", methods=["GET", "POST"])
+@app.route("/api/admin/login", methods=["POST"])
+def admin_login():
+    if request.method == "GET":
+        return redirect("/admin")
+    data = request.get_json(silent=True) if request.is_json else request.form
+    username = str((data or {}).get("username", "")).strip()
+    password = str((data or {}).get("password", "")).strip()
+    owner_username, owner_password = _admin_credentials()
+    admin = None
+    if owner_username and hmac.compare_digest(username, owner_username) and hmac.compare_digest(password, owner_password):
+        admin = {"id": "owner", "username": owner_username, "role": "owner", "permissions": ["*"]}
+    else:
+        connection = _admin_database()
+        try:
+            row = connection.execute(
+                "SELECT id, username, password_hash, role, permissions, active FROM admin_accounts "
+                "WHERE username = ? COLLATE NOCASE",
+                (username,),
+            ).fetchone()
+            if row and row["active"] and _admin_password_matches(password, row["password_hash"]):
+                try:
+                    permissions = json.loads(row["permissions"] or "[]")
+                except json.JSONDecodeError:
+                    permissions = []
+                admin = {"id": row["id"], "username": row["username"], "role": row["role"], "permissions": permissions}
+                connection.execute("UPDATE admin_accounts SET last_login = ? WHERE id = ?", (_utc_timestamp(), row["id"]))
+                connection.commit()
+        finally:
+            connection.close()
+    if not admin:
+        return jsonify({"error": "invalid_admin_credentials"}), 401
+    session["autonix_admin"] = admin
+    session.permanent = True
+    _admin_audit(admin, "administrator_login", outcome="success")
+    if request.is_json:
+        return jsonify({"success": True, "administrator": admin})
+    return redirect("/admin")
+
+
+@app.route("/admin/logout", methods=["POST", "GET"])
+@app.route("/api/admin/logout", methods=["POST"])
+def admin_logout():
+    admin = _admin_identity()
+    if admin:
+        _admin_audit(admin, "administrator_logout", outcome="success")
+    session.pop("autonix_admin", None)
+    if request.path.startswith("/api/"):
+        return jsonify({"success": True})
+    return redirect("/admin")
+
+
+@app.route("/api/admin/session")
+@_admin_required()
+def admin_session_api(admin):
+    return jsonify({"authenticated": True, "administrator": admin})
+
+
+@app.route("/api/admin/overview")
+@_admin_required("analytics")
+def admin_overview_api(admin):
+    connection = sqlite3.connect(_auth_database_path(), timeout=10)
+    connection.row_factory = sqlite3.Row
+    try:
+        now = datetime.now(timezone.utc)
+        today = now.strftime("%Y-%m-%d")
+        week = (now - timedelta(days=7)).isoformat(timespec="seconds")
+        month = (now - timedelta(days=30)).isoformat(timespec="seconds")
+        total = connection.execute("SELECT COUNT(*) FROM autonix_users").fetchone()[0]
+        active = connection.execute("SELECT COUNT(*) FROM autonix_users WHERE status = 'active'").fetchone()[0]
+        verified = connection.execute("SELECT COUNT(*) FROM autonix_users WHERE email_verified = 1").fetchone()[0]
+        suspended = connection.execute("SELECT COUNT(*) FROM autonix_users WHERE status != 'active'").fetchone()[0]
+        deriv = connection.execute("SELECT COUNT(*) FROM autonix_deriv_accounts").fetchone()[0]
+        today_count = connection.execute("SELECT COUNT(*) FROM autonix_users WHERE substr(created_at, 1, 10) = ?", (today,)).fetchone()[0]
+        week_count = connection.execute("SELECT COUNT(*) FROM autonix_users WHERE created_at >= ?", (week,)).fetchone()[0]
+        month_count = connection.execute("SELECT COUNT(*) FROM autonix_users WHERE created_at >= ?", (month,)).fetchone()[0]
+    finally:
+        connection.close()
+
+    admin_db = _admin_database()
+    try:
+        trade_total = admin_db.execute("SELECT COUNT(*) FROM trade_records").fetchone()[0]
+        trade_volume = admin_db.execute("SELECT COALESCE(SUM(stake), 0) FROM trade_records").fetchone()[0]
+        trade_today = admin_db.execute("SELECT COUNT(*) FROM trade_records WHERE substr(executed_at, 1, 10) = ?", (today,)).fetchone()[0]
+        trade_week = admin_db.execute("SELECT COUNT(*) FROM trade_records WHERE executed_at >= ?", (week,)).fetchone()[0]
+        trade_month = admin_db.execute("SELECT COUNT(*) FROM trade_records WHERE executed_at >= ?", (month,)).fetchone()[0]
+        bot_rows = admin_db.execute(
+            "SELECT COALESCE(bot_id, 'unknown') AS bot_id, COUNT(*) AS executions "
+            "FROM trade_records GROUP BY bot_id"
+        ).fetchall()
+    finally:
+        admin_db.close()
+    bots = {row["bot_id"]: row["executions"] for row in bot_rows}
+    return jsonify({
+        "users": {
+            "total": total, "active": active, "today": today_count, "week": week_count,
+            "month": month_count, "verified": verified, "unverified": total - verified,
+            "suspended": suspended,
+        },
+        "trading": {
+            "connected_deriv_accounts": deriv, "active_traders": active,
+            "total_executed_trades": trade_total, "total_volume": float(trade_volume),
+            "today": trade_today, "week": trade_week, "month": trade_month,
+        },
+        "bots": bots,
+    })
+
+
+@app.route("/api/admin/users")
+@_admin_required("users")
+def admin_users_api(admin):
+    search = str(request.args.get("search") or "").strip().lower()
+    status = str(request.args.get("status") or "").strip().lower()
+    page = max(1, int(request.args.get("page", 1)) if str(request.args.get("page", "1")).isdigit() else 1)
+    per_page = min(100, max(10, int(request.args.get("per_page", 25)) if str(request.args.get("per_page", "25")).isdigit() else 25))
+    connection = sqlite3.connect(_auth_database_path(), timeout=10)
+    connection.row_factory = sqlite3.Row
+    try:
+        clauses = []
+        params = []
+        if search:
+            clauses.append("(lower(full_name) LIKE ? OR lower(email) LIKE ?)")
+            params.extend([f"%{search}%", f"%{search}%"])
+        if status:
+            clauses.append("status = ?")
+            params.append(status)
+        where = " WHERE " + " AND ".join(clauses) if clauses else ""
+        total = connection.execute("SELECT COUNT(*) FROM autonix_users" + where, params).fetchone()[0]
+        rows = connection.execute(
+            "SELECT id, full_name, email, created_at, last_login, status, "
+            "deriv_connected, email_verified FROM autonix_users" + where +
+            " ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            params + [per_page, (page - 1) * per_page],
+        ).fetchall()
+        users = []
+        for row in rows:
+            accounts = connection.execute(
+                "SELECT deriv_account_id FROM autonix_deriv_accounts WHERE user_id = ?",
+                (row["id"],),
+            ).fetchall()
+            users.append({
+                **dict(row),
+                "email_verified": bool(row["email_verified"]),
+                "deriv_accounts": [_masked_deriv_account(r["deriv_account_id"]) for r in accounts],
+            })
+    finally:
+        connection.close()
+    return jsonify({"users": users, "page": page, "per_page": per_page, "total": total})
+
+
+@app.route("/api/admin/users/<user_id>", methods=["GET"])
+@_admin_required("users")
+def admin_user_api(admin, user_id):
+    connection = sqlite3.connect(_auth_database_path(), timeout=10)
+    connection.row_factory = sqlite3.Row
+    try:
+        row = connection.execute(
+            "SELECT id, full_name, email, created_at, last_login, status, "
+            "deriv_connected, email_verified, auth_provider FROM autonix_users WHERE id = ?",
+            (user_id,),
+        ).fetchone()
+        if not row:
+            return jsonify({"error": "user_not_found"}), 404
+        accounts = connection.execute(
+            "SELECT deriv_account_id, connected_at FROM autonix_deriv_accounts WHERE user_id = ?",
+            (user_id,),
+        ).fetchall()
+    finally:
+        connection.close()
+    result = dict(row)
+    result["email_verified"] = bool(row["email_verified"])
+    result["deriv_accounts"] = [
+        {"account": _masked_deriv_account(r["deriv_account_id"]), "connected_at": r["connected_at"]}
+        for r in accounts
+    ]
+    return jsonify(result)
+
+
+@app.route("/api/admin/users/<user_id>/status", methods=["POST", "PATCH"])
+@_admin_required("users")
+def admin_user_status_api(admin, user_id):
+    data = request.get_json(silent=True) or {}
+    status = str(data.get("status") or "").strip().lower()
+    if status not in {"active", "suspended"}:
+        return jsonify({"error": "status_must_be_active_or_suspended"}), 400
+    connection = sqlite3.connect(_auth_database_path(), timeout=10)
+    try:
+        result = connection.execute(
+            "UPDATE autonix_users SET status = ? WHERE id = ?", (status, user_id)
+        )
+        connection.commit()
+    finally:
+        connection.close()
+    if not result.rowcount:
+        return jsonify({"error": "user_not_found"}), 404
+    action = "reactivate_account" if status == "active" else "suspend_account"
+    _admin_audit(admin, action, "user", user_id, {"status": status})
+    return jsonify({"success": True, "status": status})
+
+
+@app.route("/api/admin/users/<user_id>/verify", methods=["POST"])
+@_admin_required("users")
+def admin_user_verify_api(admin, user_id):
+    connection = sqlite3.connect(_auth_database_path(), timeout=10)
+    try:
+        result = connection.execute(
+            "UPDATE autonix_users SET email_verified = 1 WHERE id = ?", (user_id,)
+        )
+        connection.commit()
+    finally:
+        connection.close()
+    if not result.rowcount:
+        return jsonify({"error": "user_not_found"}), 404
+    _admin_audit(admin, "verify_account", "user", user_id)
+    return jsonify({"success": True, "email_verified": True})
+
+
+@app.route("/api/admin/deriv-accounts")
+@_admin_required("accounts")
+def admin_deriv_accounts_api(admin):
+    rows = get_deriv_account_snapshots()
+    accounts = []
+    for row in rows:
+        account_id = row["deriv_account_id"]
+        account_type = row["account_type"]
+        if str(account_type or "").lower() in {"virtual", "demo"}:
+            account_type = "demo"
+        elif not account_type:
+            account_id_prefix = str(account_id).upper()
+            if account_id_prefix.startswith(("VRTC", "VRW", "DTML")):
+                account_type = "demo"
+            elif account_id_prefix.startswith(("CR", "MF", "MLT", "MX", "DOT", "DML")):
+                account_type = "real"
+            else:
+                account_type = "unknown"
+        else:
+            account_type = "real"
+        synced_at = row["last_successful_sync_at"]
+        accounts.append({
+            "user_id": row["user_id"],
+            "full_name": row["full_name"],
+            "email": row["email"],
+            "account_id": account_id,
+            "account_type": account_type,
+            "currency": row["currency"],
+            "balance": row["balance"],
+            "connection_status": "connected" if row["deriv_connected"] else "disconnected",
+            "last_successful_sync_at": synced_at,
+            "balance_status": "available" if synced_at and row["balance"] is not None else "unavailable",
+        })
+    return jsonify({"accounts": accounts, "total": len(accounts)})
+
+
+@app.route("/api/admin/bots")
+@_admin_required("bots")
+def admin_bots_api(admin):
+    catalog = _admin_bot_catalog()
+    connection = _admin_database()
+    try:
+        for bot in catalog:
+            usage = connection.execute(
+                "SELECT COUNT(DISTINCT user_id) AS users, COUNT(*) AS executions, "
+                "MAX(executed_at) AS last_execution FROM trade_records WHERE bot_id = ?",
+                (bot["id"],),
+            ).fetchone()
+            bot.update({
+                "users": usage["users"] or 0,
+                "executions": usage["executions"] or 0,
+                "last_execution": usage["last_execution"],
+                "operational_status": "unknown",
+            })
+    finally:
+        connection.close()
+    return jsonify({"bots": catalog})
+
+
+@app.route("/api/admin/trades")
+@_admin_required("trades")
+def admin_trades_api(admin):
+    search = str(request.args.get("search") or "").strip().lower()
+    bot_id = str(request.args.get("bot") or "").strip()
+    page = max(1, int(request.args.get("page", 1)) if str(request.args.get("page", "1")).isdigit() else 1)
+    per_page = min(100, max(10, int(request.args.get("per_page", 25)) if str(request.args.get("per_page", "25")).isdigit() else 25))
+    db = _admin_database()
+    db.row_factory = sqlite3.Row
+    try:
+        clauses = []
+        params = []
+        if search:
+            clauses.append("(lower(symbol) LIKE ? OR lower(contract_type) LIKE ?)")
+            params.extend([f"%{search}%", f"%{search}%"])
+        if bot_id:
+            clauses.append("bot_id = ?")
+            params.append(bot_id)
+        where = " WHERE " + " AND ".join(clauses) if clauses else ""
+        total = db.execute("SELECT COUNT(*) FROM trade_records" + where, params).fetchone()[0]
+        rows = db.execute(
+            "SELECT * FROM trade_records" + where +
+            " ORDER BY executed_at DESC LIMIT ? OFFSET ?",
+            params + [per_page, (page - 1) * per_page],
+        ).fetchall()
+    finally:
+        db.close()
+
+    auth_db = sqlite3.connect(_auth_database_path(), timeout=10)
+    auth_db.row_factory = sqlite3.Row
+    trade_users = {}
+    try:
+        for row in auth_db.execute("SELECT id, full_name, email FROM autonix_users").fetchall():
+            trade_users[row["id"]] = {"name": row["full_name"], "email": row["email"]}
+    finally:
+        auth_db.close()
+
+    trades = []
+    for row in rows:
+        record = dict(row)
+        record["deriv_account"] = _masked_deriv_account(record.pop("deriv_account_id", None))
+        record["user"] = trade_users.get(record.pop("user_id", None))
+        trades.append(record)
+    return jsonify({"trades": trades, "page": page, "per_page": per_page, "total": total})
+
+
+@app.route("/api/admin/trades/export")
+@_admin_required("trades")
+def admin_trades_export(admin):
+    db = _admin_database()
+    db.row_factory = sqlite3.Row
+    try:
+        rows = db.execute("SELECT * FROM trade_records ORDER BY executed_at DESC").fetchall()
+    finally:
+        db.close()
+    output = ["id,user_id,deriv_account,symbol,contract_type,direction,stake,currency,status,result,executed_at"]
+    for row in rows:
+        values = [
+            row["id"], row["user_id"] or "", _masked_deriv_account(row["deriv_account_id"]),
+            row["symbol"], row["contract_type"], row["direction"], row["stake"],
+            row["currency"], row["status"], row["result"] or "", row["executed_at"],
+        ]
+        output.append(",".join('"' + str(value).replace('"', '""') + '"' for value in values))
+    response = make_response("\n".join(output))
+    response.headers["Content-Type"] = "text/csv"
+    response.headers["Content-Disposition"] = "attachment; filename=autonix-trades.csv"
+    _admin_audit(admin, "export_trades", "trades")
+    return response
+
+
+@app.route("/api/admin/notifications", methods=["GET", "POST"])
+@_admin_required("notifications")
+def admin_notifications_api(admin):
+    db = _admin_database()
+    db.row_factory = sqlite3.Row
+    if request.method == "GET":
+        try:
+            rows = db.execute(
+                "SELECT * FROM admin_notifications ORDER BY created_at DESC LIMIT 100"
+            ).fetchall()
+        finally:
+            db.close()
+        return jsonify({"notifications": [dict(row) for row in rows]})
+    data = request.get_json(silent=True) or {}
+    title = str(data.get("title") or "").strip()
+    message = str(data.get("message") or "").strip()
+    category = str(data.get("category") or "announcement").strip().lower()
+    audience = str(data.get("audience") or "all").strip().lower()
+    if not title or not message:
+        return jsonify({"error": "title_and_message_required"}), 400
+    if len(title) > 200 or len(message) > 5000:
+        return jsonify({"error": "notification_content_too_long"}), 400
+    try:
+        cursor = db.execute(
+            "INSERT INTO admin_notifications "
+            "(title, message, category, audience, status, created_by, created_at, published_at) "
+            "VALUES (?, ?, ?, ?, 'published', ?, ?, ?)",
+            (title, message, category, audience, admin["username"], _utc_timestamp(), _utc_timestamp()),
+        )
+        db.commit()
+        notification_id = cursor.lastrowid
+    finally:
+        db.close()
+    _admin_audit(admin, "publish_notification", "notification", notification_id, {
+        "title": title, "category": category, "audience": audience,
+    })
+    return jsonify({"success": True, "id": notification_id}), 201
+
+
+@app.route("/api/admin/audit")
+@_admin_required("audit")
+def admin_audit_api(admin):
+    db = _admin_database()
+    db.row_factory = sqlite3.Row
+    try:
+        rows = db.execute(
+            "SELECT * FROM admin_audit ORDER BY created_at DESC LIMIT 250"
+        ).fetchall()
+    finally:
+        db.close()
+    return jsonify({"audit": [dict(row) for row in rows]})
+
+
+@app.route("/api/admin/administrators", methods=["GET", "POST"])
+@_admin_required("administrators")
+def admin_administrators_api(admin):
+    db = _admin_database()
+    db.row_factory = sqlite3.Row
+    if request.method == "GET":
+        try:
+            rows = db.execute(
+                "SELECT id, username, role, permissions, active, created_at, last_login "
+                "FROM admin_accounts ORDER BY created_at DESC"
+            ).fetchall()
+        finally:
+            db.close()
+        return jsonify({"administrators": [dict(row) for row in rows]})
+    if admin["role"] != "owner":
+        return jsonify({"error": "only_owner_can_manage_administrators"}), 403
+    data = request.get_json(silent=True) or {}
+    username = str(data.get("username") or "").strip()
+    password = str(data.get("password") or "")
+    role = str(data.get("role") or "administrator").strip().lower()
+    if not username or len(password) < 12 or role != "administrator":
+        return jsonify({"error": "valid_username_password_and_role_required"}), 400
+    permissions = data.get("permissions") if isinstance(data.get("permissions"), list) else []
+    allowed = {"users", "accounts", "bots", "trades", "notifications", "audit", "analytics", "settings"}
+    permissions = [permission for permission in permissions if permission in allowed]
+    try:
+        cursor = db.execute(
+            "INSERT INTO admin_accounts "
+            "(id, username, password_hash, role, permissions, active, created_at) "
+            "VALUES (?, ?, ?, ?, ?, 1, ?)",
+            (
+                str(uuid.uuid4()),
+                username,
+                _admin_password_hash(password),
+                role,
+                json.dumps(permissions),
+                _utc_timestamp(),
+            ),
+        )
+        db.commit()
+        admin_id = cursor.lastrowid
+    except sqlite3.IntegrityError:
+        return jsonify({"error": "administrator_username_exists"}), 409
+    finally:
+        db.close()
+    _admin_audit(admin, "create_administrator", "administrator", admin_id, {"username": username, "permissions": permissions})
+    return jsonify({"success": True}), 201
 
 
 # ─── Debug endpoints (for testing auth flow) ──────────────────────────────────

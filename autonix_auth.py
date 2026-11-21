@@ -74,6 +74,10 @@ def _database():
             user_id TEXT NOT NULL REFERENCES autonix_users(id) ON DELETE CASCADE,
             deriv_account_id TEXT NOT NULL UNIQUE,
             connected_at TEXT NOT NULL,
+            account_type TEXT,
+            currency TEXT,
+            balance REAL,
+            last_successful_sync_at TEXT,
             PRIMARY KEY (user_id, deriv_account_id)
         );
         CREATE TABLE IF NOT EXISTS autonix_password_resets (
@@ -104,6 +108,20 @@ def _database():
             "ALTER TABLE autonix_users ADD COLUMN email_verified "
             "INTEGER NOT NULL DEFAULT 0"
         )
+    deriv_columns = {
+        row["name"]
+        for row in connection.execute("PRAGMA table_info(autonix_deriv_accounts)")
+    }
+    for column, definition in (
+        ("account_type", "TEXT"),
+        ("currency", "TEXT"),
+        ("balance", "REAL"),
+        ("last_successful_sync_at", "TEXT"),
+    ):
+        if column not in deriv_columns:
+            connection.execute(
+                f"ALTER TABLE autonix_deriv_accounts ADD COLUMN {column} {definition}"
+            )
     return connection
 
 
@@ -260,6 +278,13 @@ def link_deriv_accounts(user_id, accounts):
                 "(user_id, deriv_account_id, connected_at) VALUES (?, ?, ?)",
                 (user_id, account_id, _timestamp()),
             )
+            account_type = account.get("accountType") or account.get("account_type")
+            if account_type:
+                connection.execute(
+                    "UPDATE autonix_deriv_accounts SET account_type = ? "
+                    "WHERE user_id = ? AND deriv_account_id = ?",
+                    (str(account_type).lower(), user_id, account_id),
+                )
             linked_any = True
         if linked_any:
             connection.execute(
@@ -274,6 +299,57 @@ def link_deriv_accounts(user_id, accounts):
     finally:
         connection.close()
     return conflicts
+
+
+def update_deriv_account_snapshots(user_id, accounts, synced_at=None):
+    """Persist non-secret account details and balances received from Deriv."""
+    if not user_id:
+        return
+    connection = _database()
+    try:
+        for account in accounts:
+            account_id = str(account.get("account") or "").strip()
+            balance = account.get("balance")
+            if not account_id or balance is None:
+                continue
+            try:
+                balance = float(balance)
+            except (TypeError, ValueError):
+                continue
+            connection.execute(
+                "UPDATE autonix_deriv_accounts SET account_type = COALESCE(?, account_type), "
+                "currency = COALESCE(?, currency), balance = ?, last_successful_sync_at = ? "
+                "WHERE user_id = ? AND deriv_account_id = ?",
+                (
+                    account.get("accountType") or account.get("account_type"),
+                    str(account.get("currency")).upper() if account.get("currency") else None,
+                    balance,
+                    synced_at or _timestamp(),
+                    user_id,
+                    account_id,
+                ),
+            )
+        connection.commit()
+    finally:
+        connection.close()
+
+
+def get_deriv_account_snapshots():
+    connection = _database()
+    try:
+        return [
+            dict(row)
+            for row in connection.execute(
+                "SELECT a.user_id, u.full_name, u.email, u.deriv_connected, "
+                "a.deriv_account_id, a.connected_at, a.account_type, a.currency, "
+                "a.balance, a.last_successful_sync_at "
+                "FROM autonix_deriv_accounts a "
+                "JOIN autonix_users u ON u.id = a.user_id "
+                "ORDER BY u.full_name COLLATE NOCASE, a.deriv_account_id"
+            ).fetchall()
+        ]
+    finally:
+        connection.close()
 
 
 def set_deriv_connection(user_id, connected):

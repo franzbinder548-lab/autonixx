@@ -5249,6 +5249,60 @@ textarea,
 .ad-profile-popover button { padding: 0; border: 0; background: none; cursor: pointer; }
 .ad-alert,
 .ad-flash { padding: 11px 14px; border: 1px solid rgba(255,111,118,.3); border-radius: 9px; background: rgba(255,90,100,.08); color: #ffb6bc; font-size: 12px; }
+.ad-email-verification-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin: -8px 0 24px;
+  padding: 14px 16px;
+  border: 1px solid rgba(245, 158, 11, .32);
+  border-radius: 10px;
+  background: rgba(245, 158, 11, .08);
+}
+.ad-email-verification-copy {
+  display: flex;
+  align-items: flex-start;
+  min-width: 0;
+  gap: 11px;
+}
+.ad-email-verification-icon {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  place-items: center;
+  border: 1px solid rgba(245, 158, 11, .42);
+  border-radius: 50%;
+  background: rgba(245, 158, 11, .12);
+  color: #f5c46b;
+  font-size: 13px;
+  font-weight: 800;
+}
+.ad-email-verification-copy strong {
+  display: block;
+  color: var(--ad-text);
+  font-size: 13px;
+  line-height: 1.35;
+}
+.ad-email-verification-copy p {
+  margin: 4px 0 0;
+  color: var(--ad-muted);
+  font-size: 11px;
+  line-height: 1.55;
+}
+.ad-email-verification-copy p span {
+  color: var(--ad-text);
+  overflow-wrap: anywhere;
+}
+.ad-email-verification-banner form {
+  flex: 0 0 auto;
+  margin: 0;
+}
+.ad-email-verification-banner .ad-button {
+  min-height: 40px;
+  white-space: nowrap;
+}
 .ad-connection-card {
   display: flex;
   align-items: center;
@@ -5435,6 +5489,16 @@ textarea,
   .ad-profile-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 540px) {
+  .ad-email-verification-banner {
+    align-items: stretch;
+    flex-direction: column;
+    margin: 0 0 20px;
+    padding: 13px;
+  }
+  .ad-email-verification-banner form,
+  .ad-email-verification-banner .ad-button {
+    width: 100%;
+  }
   .ad-navigation { gap: 2px; margin-bottom: 23px; }
   .ad-navigation > a, .ad-notifications > summary { min-height: 34px; padding-inline: 8px; font-size: 9px; }
   .ad-welcome h1 { font-size: 25px; }

@@ -12,6 +12,22 @@
     </div>
   </header>
 
+  {% if not autonix_user.email_verified %}
+  <section class="ad-email-verification-banner" role="alert" aria-label="Email verification required">
+    <div class="ad-email-verification-copy">
+      <span class="ad-email-verification-icon" aria-hidden="true">!</span>
+      <div>
+        <strong>Email address unverified</strong>
+        <p>Verify <span>{{ autonix_user.email }}</span> to secure your account and keep it available for account notifications.</p>
+      </div>
+    </div>
+    <form method="post" action="{{ url_for('autonix_auth.resend_email_verification') }}">
+      <input type="hidden" name="csrf_token" value="{{ autonix_csrf_token }}">
+      <button class="ad-button ad-button-secondary" type="submit">Resend verification email</button>
+    </form>
+  </section>
+  {% endif %}
+
   {% if session.get("autonix_deriv_link_error") %}
   <p class="ad-alert" role="alert">{{ session.get("autonix_deriv_link_error") }}</p>
   {% endif %}

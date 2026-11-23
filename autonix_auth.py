@@ -98,6 +98,21 @@ def _database():
             last_seen_at TEXT NOT NULL,
             PRIMARY KEY (user_id, device_hash)
         );
+        CREATE TABLE IF NOT EXISTS autonix_user_notifications (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL REFERENCES autonix_users(id) ON DELETE CASCADE,
+            title TEXT NOT NULL,
+            message TEXT NOT NULL,
+            category TEXT NOT NULL DEFAULT 'account',
+            created_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS autonix_notification_reads (
+            user_id TEXT NOT NULL REFERENCES autonix_users(id) ON DELETE CASCADE,
+            source TEXT NOT NULL,
+            notification_id TEXT NOT NULL,
+            read_at TEXT NOT NULL,
+            PRIMARY KEY (user_id, source, notification_id)
+        );
         """
     )
     user_columns = {
@@ -173,6 +188,25 @@ def _database():
             connection.rollback()
             raise
     return connection
+
+
+def create_user_notification(user_id, title, message, category="account"):
+    """Create a personal in-app notification for an Autonix user."""
+    if not user_id or not title or not message:
+        raise ValueError("A user, notification title, and message are required.")
+    connection = _database()
+    try:
+        cursor = connection.execute(
+            "INSERT INTO autonix_user_notifications "
+            "(user_id, title, message, category, created_at) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (user_id, str(title).strip(), str(message).strip(),
+             str(category or "account").strip().lower(), _timestamp()),
+        )
+        connection.commit()
+        return cursor.lastrowid
+    finally:
+        connection.close()
 
 
 def _csrf_token():
@@ -739,6 +773,18 @@ def register():
             "(id, full_name, email, password_hash, auth_provider, created_at) "
             "VALUES (?, ?, ?, ?, 'email', ?)",
             (user_id, full_name, email, _password_hash(password), created_at),
+        )
+        connection.execute(
+            "INSERT INTO autonix_user_notifications "
+            "(user_id, title, message, category, created_at) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (
+                user_id,
+                "Welcome to Autonix",
+                "Your Autonix profile is ready. Connect your Deriv account to get started.",
+                "account",
+                created_at,
+            ),
         )
         connection.commit()
     except sqlite3.IntegrityError:

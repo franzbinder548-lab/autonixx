@@ -19,6 +19,9 @@ class AutonixAuthTests(unittest.TestCase):
             os.environ,
             {
                 "AUTONIX_AUTH_DATABASE_PATH": self.database_path,
+                "AUTONIX_ADMIN_DATABASE_PATH": os.path.join(
+                    self.temp_dir.name, "admin.sqlite3"
+                ),
                 "AUTONIX_PUBLIC_URL": "https://autonixtrading.online",
                 "SMTP_HOST": "",
                 "SMTP_PORT": "",
@@ -54,6 +57,154 @@ class AutonixAuthTests(unittest.TestCase):
             },
         )
 
+    def _create_user(self, user_id, email, email_verified=False):
+        connection = auth._database()
+        try:
+            connection.execute(
+                "INSERT INTO autonix_users "
+                "(id, full_name, email, auth_provider, created_at, email_verified) "
+                "VALUES (?, ?, ?, 'email', ?, ?)",
+                (
+                    user_id,
+                    "Notification Test User",
+                    email,
+                    auth._timestamp(),
+                    int(email_verified),
+                ),
+            )
+            connection.commit()
+        finally:
+            connection.close()
+
+    def test_user_notification_inbox_filters_audiences_and_tracks_reads(self):
+        self._create_user("user-one", "one@example.com")
+        self._create_user("user-two", "two@example.com", email_verified=True)
+        auth.create_user_notification(
+            "user-one", "Personal notice", "A message for user one."
+        )
+
+        admin_db = flask_app._admin_database()
+        try:
+            for title, audience, recipient in (
+                ("Everyone", "all", None),
+                ("Verified only", "verified", None),
+                ("Unverified only", "unverified", None),
+            ):
+                admin_db.execute(
+                    "INSERT INTO admin_notifications "
+                    "(title, message, category, audience, recipient_user_id, "
+                    "status, created_by, created_at, published_at) "
+                    "VALUES (?, ?, 'announcement', ?, ?, 'published', 'admin', ?, ?)",
+                    (
+                        title,
+                        title + " message",
+                        audience,
+                        recipient,
+                        auth._timestamp(),
+                        auth._timestamp(),
+                    ),
+                )
+            admin_db.commit()
+        finally:
+            admin_db.close()
+
+        with self.client.session_transaction() as user_session:
+            user_session["autonix_admin"] = {
+                "id": "owner",
+                "username": "admin",
+                "role": "owner",
+                "permissions": ["*"],
+            }
+        specific = self.client.post(
+            "/api/admin/notifications",
+            json={
+                "title": "Specific recipient",
+                "message": "A message just for user one.",
+                "audience": "user",
+                "recipient_user_id": "user-one",
+            },
+        )
+        self.assertEqual(specific.status_code, 201)
+
+        with self.client.session_transaction() as user_session:
+            user_session["autonix_user_id"] = "user-one"
+            user_session["autonix_csrf_token"] = "notification-test-csrf"
+        response = self.client.get("/api/notifications")
+        self.assertEqual(response.status_code, 200)
+        titles = {item["title"] for item in response.json["notifications"]}
+        self.assertEqual(
+            titles,
+            {"Personal notice", "Everyone", "Unverified only", "Specific recipient"},
+        )
+        self.assertEqual(response.json["unread_count"], 4)
+        dashboard = self.client.get("/dashboard")
+        self.assertEqual(dashboard.status_code, 200)
+        self.assertIn(b'id="notificationToggle"', dashboard.data)
+        self.assertIn(b'id="notificationPanel"', dashboard.data)
+
+        notification = next(
+            item for item in response.json["notifications"]
+            if item["title"] == "Specific recipient"
+        )
+        missing_csrf = self.client.post(
+            "/api/notifications",
+            json={"source": "admin", "notification_id": notification["id"]},
+        )
+        self.assertEqual(missing_csrf.status_code, 400)
+        marked = self.client.post(
+            "/api/notifications",
+            headers={"X-CSRF-Token": "notification-test-csrf"},
+            json={"source": "admin", "notification_id": notification["id"]},
+        )
+        self.assertEqual(marked.status_code, 200)
+        self.assertEqual(marked.json["unread_count"], 3)
+
+        with self.client.session_transaction() as user_session:
+            user_session["autonix_user_id"] = "user-two"
+        second_user = self.client.get("/api/notifications")
+        second_titles = {
+            item["title"] for item in second_user.json["notifications"]
+        }
+        self.assertIn("Verified only", second_titles)
+        self.assertNotIn("Specific recipient", second_titles)
+        self.assertNotIn("Personal notice", second_titles)
+
+    def test_existing_admin_notification_table_migrates_for_personal_delivery(self):
+        connection = sqlite3.connect(
+            os.environ["AUTONIX_ADMIN_DATABASE_PATH"]
+        )
+        try:
+            connection.execute(
+                """
+                CREATE TABLE admin_notifications (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    title TEXT NOT NULL,
+                    message TEXT NOT NULL,
+                    category TEXT NOT NULL DEFAULT 'announcement',
+                    audience TEXT NOT NULL DEFAULT 'all',
+                    status TEXT NOT NULL DEFAULT 'published',
+                    created_by TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    published_at TEXT
+                )
+                """
+            )
+            connection.commit()
+        finally:
+            connection.close()
+
+        connection = flask_app._admin_database()
+        try:
+            columns = {
+                row["name"]
+                for row in connection.execute(
+                    "PRAGMA table_info(admin_notifications)"
+                )
+            }
+        finally:
+            connection.close()
+        self.assertIn("recipient_user_id", columns)
+
     def test_registration_and_login_do_not_require_a_deriv_session(self):
         response = self._register()
         self.assertEqual(response.status_code, 302)
@@ -61,6 +212,14 @@ class AutonixAuthTests(unittest.TestCase):
         with self.client.session_transaction() as user_session:
             self.assertTrue(user_session.get("autonix_user_id"))
             self.assertNotIn("user", user_session)
+
+        notifications = self.client.get("/api/notifications")
+        self.assertEqual(notifications.status_code, 200)
+        self.assertEqual(notifications.json["unread_count"], 1)
+        self.assertEqual(
+            notifications.json["notifications"][0]["title"],
+            "Welcome to Autonix",
+        )
 
         self.client.get("/dashboard")
         self.client.post(

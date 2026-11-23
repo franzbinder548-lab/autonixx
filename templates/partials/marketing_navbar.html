@@ -112,6 +112,24 @@
     <!-- Right side: utilities + hamburger -->
     <div class="navbar-end">
 
+      {% if autonix_user %}
+      <div class="notification-control" id="notificationControl">
+        <button class="notification-toggle" id="notificationToggle" type="button" aria-label="Notifications" aria-expanded="false" aria-controls="notificationPanel">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg>
+          <span class="notification-count" id="notificationCount" hidden></span>
+        </button>
+        <section class="notification-panel" id="notificationPanel" aria-label="Notifications" hidden>
+          <div class="notification-panel-header">
+            <div><strong>Notifications</strong><span id="notificationSummary">Loading…</span></div>
+            <button type="button" id="notificationMarkAll" class="notification-mark-all" hidden>Mark all read</button>
+          </div>
+          <div class="notification-list" id="notificationList" aria-live="polite">
+            <p class="notification-empty">Loading notifications…</p>
+          </div>
+        </section>
+      </div>
+      {% endif %}
+
       {% if request.path in ['/dashboard', '/bots', '/trader'] %}
       <div class="nav-search-wrap nav-market-search">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -234,5 +252,114 @@
   if (nav) {
     window.addEventListener("scroll", function () { nav.classList.toggle("nav-scrolled", window.scrollY > 24); }, { passive: true });
   }
+})();
+
+(function () {
+  var control = document.getElementById("notificationControl");
+  if (!control) return;
+  var toggle = document.getElementById("notificationToggle");
+  var panel = document.getElementById("notificationPanel");
+  var badge = document.getElementById("notificationCount");
+  var list = document.getElementById("notificationList");
+  var summary = document.getElementById("notificationSummary");
+  var markAll = document.getElementById("notificationMarkAll");
+  var csrfToken = {{ autonix_csrf_token | tojson }};
+  var notifications = [];
+  var unreadTotal = 0;
+
+  function escapeHtml(value) {
+    return String(value == null ? "" : value).replace(/[&<>"']/g, function (char) {
+      return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[char];
+    });
+  }
+
+  function render() {
+    var unreadCount = unreadTotal;
+    badge.hidden = unreadCount === 0;
+    badge.textContent = unreadCount > 99 ? "99+" : String(unreadCount);
+    toggle.setAttribute("aria-label", unreadCount
+      ? "Notifications, " + unreadCount + " unread"
+      : "Notifications");
+    summary.textContent = unreadCount
+      ? unreadCount + " unread"
+      : notifications.length + " total";
+    markAll.hidden = unreadCount === 0;
+    if (!notifications.length) {
+      list.innerHTML = '<p class="notification-empty">You are all caught up.</p>';
+      return;
+    }
+    list.innerHTML = notifications.map(function (item) {
+      return '<article class="notification-item' + (item.read ? " is-read" : " is-unread") + '">' +
+        '<div class="notification-item-meta"><span>' + escapeHtml(item.source === "admin" ? "Autonix update" : "Account notice") +
+        '</span><time>' + escapeHtml(item.created_at || "") + '</time></div>' +
+        '<strong>' + escapeHtml(item.title) + '</strong>' +
+        '<p>' + escapeHtml(item.message) + '</p>' +
+        (item.read ? "" : '<button type="button" class="notification-read-button" data-source="' +
+          escapeHtml(item.source) + '" data-notification-id="' + escapeHtml(item.id) + '">Mark as read</button>') +
+        '</article>';
+    }).join("");
+  }
+
+  function loadNotifications() {
+    return fetch("/api/notifications", {credentials: "same-origin"})
+      .then(function (response) {
+        if (!response.ok) throw new Error("Unable to load notifications.");
+        return response.json();
+      })
+      .then(function (data) {
+        notifications = data.notifications || [];
+        unreadTotal = Number(data.unread_count || 0);
+        render();
+      })
+      .catch(function () {
+        list.innerHTML = '<p class="notification-error">Notifications could not be loaded. Please try again.</p>';
+        summary.textContent = "Unavailable";
+      });
+  }
+
+  function markRead(payload) {
+    return fetch("/api/notifications", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {"Content-Type": "application/json", "X-CSRF-Token": csrfToken},
+      body: JSON.stringify(payload)
+    }).then(function (response) {
+      if (!response.ok) throw new Error("Unable to update notifications.");
+      return loadNotifications();
+    }).catch(function () {
+      list.insertAdjacentHTML("afterbegin", '<p class="notification-error">Could not update notification status. Please try again.</p>');
+    });
+  }
+
+  toggle.addEventListener("click", function () {
+    var open = panel.hidden;
+    panel.hidden = !open;
+    toggle.setAttribute("aria-expanded", String(open));
+    if (open) loadNotifications();
+  });
+  markAll.addEventListener("click", function () { markRead({read_all: true}); });
+  list.addEventListener("click", function (event) {
+    var button = event.target.closest("[data-notification-id]");
+    if (!button) return;
+    markRead({
+      source: button.getAttribute("data-source"),
+      notification_id: button.getAttribute("data-notification-id")
+    });
+  });
+  document.addEventListener("click", function (event) {
+    if (!control.contains(event.target)) {
+      panel.hidden = true;
+      toggle.setAttribute("aria-expanded", "false");
+    }
+  });
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape" && !panel.hidden) {
+      panel.hidden = true;
+      toggle.setAttribute("aria-expanded", "false");
+      toggle.focus();
+    }
+  });
+  window.setInterval(loadNotifications, 60000);
+  loadNotifications();
 })();
 </script>

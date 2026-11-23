@@ -7333,3 +7333,208 @@ html:has(.autonix-auth-page) {
     flex-direction: column;
   }
 }
+
+.notification-control {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.notification-toggle {
+  position: relative;
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 1px solid rgba(255,255,255,.16);
+  border-radius: 9px;
+  background: transparent;
+  color: rgba(255,255,255,.82);
+  cursor: pointer;
+}
+
+.notification-toggle:hover,
+.notification-toggle[aria-expanded="true"] {
+  border-color: var(--color-brand,#ff444f);
+  color: #fff;
+}
+
+.notification-toggle:focus-visible,
+.notification-panel button:focus-visible {
+  outline: 2px solid var(--color-brand,#ff444f);
+  outline-offset: 2px;
+}
+
+.notification-count {
+  position: absolute;
+  top: -6px;
+  right: -7px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border: 2px solid var(--nav-bg,#080810);
+  border-radius: 10px;
+  background: var(--color-brand,#ff444f);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 13px;
+  text-align: center;
+}
+
+.notification-panel[hidden],
+.notification-count[hidden] {
+  display: none !important;
+}
+
+.notification-panel {
+  position: absolute;
+  z-index: 1200;
+  top: calc(100% + 10px);
+  right: 0;
+  display: flex;
+  width: min(390px, calc(100vw - 24px));
+  max-height: min(560px, 75vh, calc(100vh - 90px));
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: 12px;
+  background: #101117;
+  box-shadow: 0 16px 48px rgba(0,0,0,.5);
+  color: #f4f4f5;
+}
+
+.notification-panel-header {
+  display: flex;
+  min-height: 60px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 15px;
+  border-bottom: 1px solid rgba(255,255,255,.1);
+}
+
+.notification-panel-header > div {
+  display: grid;
+  gap: 3px;
+}
+
+.notification-panel-header strong {
+  font-size: 14px;
+}
+
+.notification-panel-header span,
+.notification-item-meta {
+  color: rgba(255,255,255,.52);
+  font-size: 10px;
+}
+
+.notification-mark-all,
+.notification-read-button {
+  border: 0;
+  background: transparent;
+  color: #ff6570;
+  cursor: pointer;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.notification-list {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.notification-item {
+  padding: 13px 15px;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+
+.notification-item.is-unread {
+  background: rgba(255,255,255,.035);
+}
+
+.notification-item-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 7px;
+}
+
+.notification-item-meta span {
+  color: #ff737c;
+  font-weight: 700;
+}
+
+.notification-item-meta time {
+  text-align: right;
+}
+
+.notification-item > strong {
+  display: block;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.notification-item p {
+  margin: 5px 0 0;
+  color: rgba(255,255,255,.68);
+  font-size: 11px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.notification-read-button {
+  margin: 9px 0 0;
+  padding: 0;
+}
+
+.notification-empty,
+.notification-error {
+  margin: 0;
+  padding: 23px 15px;
+  color: rgba(255,255,255,.58);
+  font-size: 11px;
+  text-align: center;
+}
+
+.notification-error {
+  color: #ff9a9f;
+}
+
+[data-theme="light"] .notification-toggle {
+  border-color: rgba(0,0,0,.18);
+  color: rgba(0,0,0,.72);
+}
+
+[data-theme="light"] .notification-panel {
+  border-color: rgba(0,0,0,.12);
+  background: #fff;
+  color: #191919;
+}
+
+[data-theme="light"] .notification-panel-header,
+[data-theme="light"] .notification-item {
+  border-color: rgba(0,0,0,.08);
+}
+
+[data-theme="light"] .notification-item.is-unread {
+  background: rgba(0,0,0,.025);
+}
+
+[data-theme="light"] .notification-panel-header span,
+[data-theme="light"] .notification-item-meta,
+[data-theme="light"] .notification-item p,
+[data-theme="light"] .notification-empty {
+  color: rgba(0,0,0,.58);
+}
+
+@media (max-width: 420px) {
+  .notification-panel {
+    position: fixed;
+    top: 62px;
+    right: 12px;
+    max-height: calc(100vh - 78px);
+  }
+}

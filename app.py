@@ -1249,6 +1249,129 @@ def dashboard():
     return response
 
 
+def _visible_user_notifications(user):
+    user_id = user["id"]
+    auth_db = sqlite3.connect(_auth_database_path(), timeout=10)
+    auth_db.row_factory = sqlite3.Row
+    try:
+        profile = auth_db.execute(
+            "SELECT email_verified FROM autonix_users WHERE id = ? AND status = 'active'",
+            (user_id,),
+        ).fetchone()
+        if not profile:
+            return []
+        admin_db = _admin_database()
+        try:
+            admin_rows = admin_db.execute(
+                "SELECT id, title, message, category, created_at, published_at "
+                "FROM admin_notifications WHERE status = 'published' "
+                "AND published_at IS NOT NULL AND "
+                "(audience = 'all' OR "
+                "(audience = 'user' AND recipient_user_id = ?) OR "
+                "(audience = 'verified' AND ? = 1) OR "
+                "(audience = 'unverified' AND ? = 0))",
+                (user_id, int(profile["email_verified"]), int(profile["email_verified"])),
+            ).fetchall()
+        finally:
+            admin_db.close()
+
+        personal_rows = auth_db.execute(
+            "SELECT id, title, message, category, created_at "
+            "FROM autonix_user_notifications WHERE user_id = ?",
+            (user_id,),
+        ).fetchall()
+        reads = {
+            (row["source"], row["notification_id"])
+            for row in auth_db.execute(
+                "SELECT source, notification_id FROM autonix_notification_reads "
+                "WHERE user_id = ?",
+                (user_id,),
+            ).fetchall()
+        }
+        notifications = [
+            {
+                "id": str(row["id"]),
+                "source": "admin",
+                "title": row["title"],
+                "message": row["message"],
+                "category": row["category"],
+                "created_at": row["published_at"] or row["created_at"],
+                "read": ("admin", str(row["id"])) in reads,
+            }
+            for row in admin_rows
+        ]
+        notifications.extend(
+            {
+                "id": str(row["id"]),
+                "source": "user",
+                "title": row["title"],
+                "message": row["message"],
+                "category": row["category"],
+                "created_at": row["created_at"],
+                "read": ("user", str(row["id"])) in reads,
+            }
+            for row in personal_rows
+        )
+        notifications.sort(key=lambda item: item["created_at"], reverse=True)
+        return notifications
+    finally:
+        auth_db.close()
+
+
+@app.route("/api/notifications", methods=["GET", "POST"])
+def user_notifications_api():
+    user = get_current_autonix_user()
+    if not user:
+        return jsonify({"error": "autonix_authentication_required"}), 401
+
+    if request.method == "POST":
+        expected_csrf = session.get("autonix_csrf_token", "")
+        supplied_csrf = request.headers.get("X-CSRF-Token", "")
+        if not expected_csrf or not supplied_csrf or not hmac.compare_digest(
+            expected_csrf, supplied_csrf
+        ):
+            return jsonify({"error": "csrf_validation_failed"}), 400
+        data = request.get_json(silent=True) or {}
+        visible = _visible_user_notifications(user)
+        if data.get("read_all") is True:
+            selected = visible
+        else:
+            source = str(data.get("source") or "")
+            notification_id = str(data.get("notification_id") or "")
+            selected = [
+                item for item in visible
+                if item["source"] == source and item["id"] == notification_id
+            ]
+            if not selected:
+                return jsonify({"error": "notification_not_found"}), 404
+
+        connection = sqlite3.connect(_auth_database_path(), timeout=10)
+        try:
+            connection.executemany(
+                "INSERT OR IGNORE INTO autonix_notification_reads "
+                "(user_id, source, notification_id, read_at) VALUES (?, ?, ?, ?)",
+                [
+                    (user["id"], item["source"], item["id"], _utc_timestamp())
+                    for item in selected
+                ],
+            )
+            connection.commit()
+        except sqlite3.Error:
+            connection.rollback()
+            app.logger.exception("Could not save notification read state")
+            return jsonify({"error": "notification_read_state_save_failed"}), 500
+        finally:
+            connection.close()
+
+    notifications = _visible_user_notifications(user)
+    response = jsonify({
+        "notifications": notifications[:100],
+        "unread_count": sum(not item["read"] for item in notifications),
+    })
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
 @app.route("/api/deriv-accounts/refresh", methods=["POST"])
 def refresh_deriv_account_snapshots_api():
     expected_csrf = session.get("autonix_csrf_token", "")
@@ -2604,6 +2727,7 @@ def _admin_database():
             message TEXT NOT NULL,
             category TEXT NOT NULL DEFAULT 'announcement',
             audience TEXT NOT NULL DEFAULT 'all',
+            recipient_user_id TEXT,
             status TEXT NOT NULL DEFAULT 'published',
             created_by TEXT NOT NULL,
             created_at TEXT NOT NULL,
@@ -2626,6 +2750,14 @@ def _admin_database():
         );
         """
     )
+    notification_columns = {
+        row["name"]
+        for row in connection.execute("PRAGMA table_info(admin_notifications)")
+    }
+    if "recipient_user_id" not in notification_columns:
+        connection.execute(
+            "ALTER TABLE admin_notifications ADD COLUMN recipient_user_id TEXT"
+        )
     # A permissions typo-safe migration for older SQLite-created databases.
     columns = {row["name"] for row in connection.execute("PRAGMA table_info(admin_accounts)")}
     if "permissions" not in columns:
@@ -3121,6 +3253,7 @@ def admin_notifications_api(admin):
         finally:
             db.close()
         return jsonify({"notifications": [dict(row) for row in rows]})
+    db.close()
     data = request.get_json(silent=True) or {}
     title = str(data.get("title") or "").strip()
     message = str(data.get("message") or "").strip()
@@ -3130,12 +3263,34 @@ def admin_notifications_api(admin):
         return jsonify({"error": "title_and_message_required"}), 400
     if len(title) > 200 or len(message) > 5000:
         return jsonify({"error": "notification_content_too_long"}), 400
+    if audience not in {"all", "verified", "unverified", "user"}:
+        return jsonify({"error": "invalid_notification_audience"}), 400
+    recipient_user_id = None
+    if audience == "user":
+        recipient_user_id = str(data.get("recipient_user_id") or "").strip()
+        if not recipient_user_id:
+            return jsonify({"error": "notification_recipient_required"}), 400
+        auth_db = sqlite3.connect(_auth_database_path(), timeout=10)
+        try:
+            recipient = auth_db.execute(
+                "SELECT id FROM autonix_users WHERE id = ? AND status = 'active'",
+                (recipient_user_id,),
+            ).fetchone()
+        finally:
+            auth_db.close()
+        if not recipient:
+            return jsonify({"error": "notification_recipient_not_found"}), 404
+    db = _admin_database()
     try:
         cursor = db.execute(
             "INSERT INTO admin_notifications "
-            "(title, message, category, audience, status, created_by, created_at, published_at) "
-            "VALUES (?, ?, ?, ?, 'published', ?, ?, ?)",
-            (title, message, category, audience, admin["username"], _utc_timestamp(), _utc_timestamp()),
+            "(title, message, category, audience, recipient_user_id, status, "
+            "created_by, created_at, published_at) "
+            "VALUES (?, ?, ?, ?, ?, 'published', ?, ?, ?)",
+            (
+                title, message, category, audience, recipient_user_id,
+                admin["username"], _utc_timestamp(), _utc_timestamp(),
+            ),
         )
         db.commit()
         notification_id = cursor.lastrowid
@@ -3143,8 +3298,27 @@ def admin_notifications_api(admin):
         db.close()
     _admin_audit(admin, "publish_notification", "notification", notification_id, {
         "title": title, "category": category, "audience": audience,
+        "recipient_user_id": recipient_user_id,
     })
     return jsonify({"success": True, "id": notification_id}), 201
+
+
+@app.route("/api/admin/notification-recipients")
+@_admin_required("notifications")
+def admin_notification_recipients_api(admin):
+    connection = sqlite3.connect(_auth_database_path(), timeout=10)
+    connection.row_factory = sqlite3.Row
+    try:
+        users = [
+            dict(row)
+            for row in connection.execute(
+                "SELECT id, full_name, email FROM autonix_users "
+                "WHERE status = 'active' ORDER BY full_name COLLATE NOCASE"
+            ).fetchall()
+        ]
+    finally:
+        connection.close()
+    return jsonify({"users": users})
 
 
 @app.route("/api/admin/audit")

@@ -587,12 +587,7 @@ def _associate_autonix_deriv_accounts(accounts=None):
             return False
         accounts = deriv_user.get("accounts", [])
     try:
-        conflicts = link_deriv_accounts(autonix_user_id, accounts)
-        if conflicts:
-            session["autonix_deriv_link_error"] = (
-                "One or more Deriv accounts are linked to another Autonix profile."
-            )
-            return False
+        link_deriv_accounts(autonix_user_id, accounts)
         if not any(str(account.get("account") or "").strip() for account in accounts):
             session.pop("autonix_deriv_link_error", None)
             return False

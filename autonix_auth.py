@@ -72,7 +72,7 @@ def _database():
         );
         CREATE TABLE IF NOT EXISTS autonix_deriv_accounts (
             user_id TEXT NOT NULL REFERENCES autonix_users(id) ON DELETE CASCADE,
-            deriv_account_id TEXT NOT NULL UNIQUE,
+            deriv_account_id TEXT NOT NULL,
             connected_at TEXT NOT NULL,
             account_type TEXT,
             currency TEXT,
@@ -122,6 +122,56 @@ def _database():
             connection.execute(
                 f"ALTER TABLE autonix_deriv_accounts ADD COLUMN {column} {definition}"
             )
+    has_unique_account_index = False
+    for index in connection.execute("PRAGMA index_list(autonix_deriv_accounts)"):
+        if not index["unique"]:
+            continue
+        index_name = index["name"].replace('"', '""')
+        columns = [
+            row["name"]
+            for row in connection.execute(
+                f'PRAGMA index_info("{index_name}")'
+            )
+        ]
+        if columns == ["deriv_account_id"]:
+            has_unique_account_index = True
+            break
+    if has_unique_account_index:
+        connection.execute("BEGIN IMMEDIATE")
+        try:
+            connection.execute(
+                """
+                CREATE TABLE autonix_deriv_accounts_new (
+                    user_id TEXT NOT NULL REFERENCES autonix_users(id) ON DELETE CASCADE,
+                    deriv_account_id TEXT NOT NULL,
+                    connected_at TEXT NOT NULL,
+                    account_type TEXT,
+                    currency TEXT,
+                    balance REAL,
+                    last_successful_sync_at TEXT,
+                    PRIMARY KEY (user_id, deriv_account_id)
+                )
+                """
+            )
+            connection.execute(
+                """
+                INSERT INTO autonix_deriv_accounts_new
+                    (user_id, deriv_account_id, connected_at, account_type,
+                     currency, balance, last_successful_sync_at)
+                SELECT user_id, deriv_account_id, connected_at, account_type,
+                       currency, balance, last_successful_sync_at
+                FROM autonix_deriv_accounts
+                """
+            )
+            connection.execute("DROP TABLE autonix_deriv_accounts")
+            connection.execute(
+                "ALTER TABLE autonix_deriv_accounts_new "
+                "RENAME TO autonix_deriv_accounts"
+            )
+            connection.commit()
+        except sqlite3.Error:
+            connection.rollback()
+            raise
     return connection
 
 
@@ -258,20 +308,12 @@ def link_deriv_accounts(user_id, accounts):
     if not user_id:
         return []
     connection = _database()
-    conflicts = []
     linked_any = False
     try:
         connection.execute("BEGIN IMMEDIATE")
         for account in accounts:
             account_id = str(account.get("account") or "").strip()
             if not account_id:
-                continue
-            owner = connection.execute(
-                "SELECT user_id FROM autonix_deriv_accounts WHERE deriv_account_id = ?",
-                (account_id,),
-            ).fetchone()
-            if owner and owner["user_id"] != user_id:
-                conflicts.append(account_id)
                 continue
             connection.execute(
                 "INSERT OR IGNORE INTO autonix_deriv_accounts "
@@ -298,7 +340,7 @@ def link_deriv_accounts(user_id, accounts):
         raise
     finally:
         connection.close()
-    return conflicts
+    return []
 
 
 def update_deriv_account_snapshots(user_id, accounts, synced_at=None):

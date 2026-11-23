@@ -107,26 +107,39 @@ class AutonixAuthTests(unittest.TestCase):
         self.assertIn(b'href="/auth/login"', dashboard.data)
         self.assertIn(b"https://t.deriv.link?t=99THF5S5V9K8", dashboard.data)
 
-    def test_deriv_account_owned_by_another_user_is_not_shown(self):
+    def test_deriv_account_can_be_linked_to_multiple_autonix_profiles(self):
         self._register("first@example.com")
         with self.client.session_transaction() as user_session:
+            first_user_id = user_session["autonix_user_id"]
+            first_account = {
+                "account": "CR100001",
+                "currency": "USD",
+                "isVirtual": False,
+                "accountType": "real",
+                "balance": 0,
+            }
+            additional_account = {
+                "account": "CR100002",
+                "currency": "USD",
+                "isVirtual": True,
+                "accountType": "demo",
+                "balance": 0,
+            }
             user_session["user"] = {
                 "isAuthenticated": True,
-                "activeAccount": {
-                    "account": "CR100001",
-                    "currency": "USD",
-                    "isVirtual": False,
-                    "accountType": "real",
-                    "balance": 0,
-                },
-                "accounts": [{"account": "CR100001"}],
+                "activeAccount": first_account,
+                "accounts": [first_account, additional_account],
                 "_accessToken": "",
             }
-        self.client.get("/dashboard")
+        first_dashboard = self.client.get("/dashboard")
+        self.assertEqual(first_dashboard.status_code, 200)
         self.client.post("/account/logout", data={"csrf_token": self._csrf()})
 
         self._register("second@example.com")
         with self.client.session_transaction() as user_session:
+            second_user_id = user_session["autonix_user_id"]
+            shared_account = {"account": "CR100001", "accountType": "real"}
+            second_account = {"account": "CR100003", "accountType": "demo"}
             user_session["user"] = {
                 "isAuthenticated": True,
                 "activeAccount": {
@@ -136,22 +149,95 @@ class AutonixAuthTests(unittest.TestCase):
                     "accountType": "real",
                     "balance": 0,
                 },
-                "accounts": [{
-                    "account": "CR100001",
-                    "currency": "USD",
-                    "isVirtual": False,
-                    "accountType": "real",
-                    "balance": 0,
-                }],
+                "accounts": [shared_account, second_account],
                 "_accessToken": "",
             }
         dashboard = self.client.get("/dashboard")
         self.assertEqual(dashboard.status_code, 200)
-        self.assertIn(b"One or more Deriv accounts are linked to another Autonix profile.", dashboard.data)
-        self.assertNotIn(b"CR100001", dashboard.data)
+        self.assertNotIn(
+            b"One or more Deriv accounts are linked to another Autonix profile.",
+            dashboard.data,
+        )
         profile = self.client.get("/account/profile").json
-        self.assertFalse(profile["deriv_connected"])
-        self.assertEqual(profile["deriv_accounts"], [])
+        self.assertTrue(profile["deriv_connected"])
+        self.assertEqual(profile["deriv_accounts"], ["CR100001", "CR100003"])
+
+        connection = auth._database()
+        try:
+            links = connection.execute(
+                "SELECT user_id, deriv_account_id FROM autonix_deriv_accounts "
+                "WHERE user_id IN (?, ?) ORDER BY user_id, deriv_account_id",
+                (first_user_id, second_user_id),
+            ).fetchall()
+        finally:
+            connection.close()
+        self.assertEqual(
+            [(row["user_id"], row["deriv_account_id"]) for row in links],
+            sorted([
+                (first_user_id, "CR100001"),
+                (first_user_id, "CR100002"),
+                (second_user_id, "CR100001"),
+                (second_user_id, "CR100003"),
+            ]),
+        )
+
+    def test_existing_deriv_account_links_migrate_to_multi_profile_schema(self):
+        connection = sqlite3.connect(self.database_path)
+        try:
+            connection.executescript(
+                """
+                CREATE TABLE autonix_users (
+                    id TEXT PRIMARY KEY,
+                    full_name TEXT NOT NULL,
+                    email TEXT NOT NULL COLLATE NOCASE UNIQUE,
+                    password_hash TEXT,
+                    auth_provider TEXT NOT NULL,
+                    google_id TEXT UNIQUE,
+                    created_at TEXT NOT NULL,
+                    last_login TEXT,
+                    status TEXT NOT NULL DEFAULT 'active',
+                    deriv_connected INTEGER NOT NULL DEFAULT 0,
+                    email_verified INTEGER NOT NULL DEFAULT 0
+                );
+                CREATE TABLE autonix_deriv_accounts (
+                    user_id TEXT NOT NULL REFERENCES autonix_users(id) ON DELETE CASCADE,
+                    deriv_account_id TEXT NOT NULL UNIQUE,
+                    connected_at TEXT NOT NULL,
+                    account_type TEXT,
+                    currency TEXT,
+                    balance REAL,
+                    last_successful_sync_at TEXT,
+                    PRIMARY KEY (user_id, deriv_account_id)
+                );
+                INSERT INTO autonix_users (id, full_name, email, auth_provider, created_at)
+                    VALUES ('first-user', 'First User', 'first@example.com', 'password', '2026-01-01');
+                INSERT INTO autonix_users (id, full_name, email, auth_provider, created_at)
+                    VALUES ('second-user', 'Second User', 'second@example.com', 'password', '2026-01-01');
+                INSERT INTO autonix_deriv_accounts
+                    (user_id, deriv_account_id, connected_at)
+                    VALUES ('first-user', 'CR100001', '2026-01-01');
+                """
+            )
+        finally:
+            connection.close()
+
+        self.assertEqual(
+            auth.link_deriv_accounts("second-user", [{"account": "CR100001"}]),
+            [],
+        )
+        connection = auth._database()
+        try:
+            linked_users = connection.execute(
+                "SELECT user_id FROM autonix_deriv_accounts "
+                "WHERE deriv_account_id = ? ORDER BY user_id",
+                ("CR100001",),
+            ).fetchall()
+        finally:
+            connection.close()
+        self.assertEqual(
+            [row["user_id"] for row in linked_users],
+            ["first-user", "second-user"],
+        )
 
     def test_profile_name_update_requires_csrf_and_saves_name(self):
         self._register()

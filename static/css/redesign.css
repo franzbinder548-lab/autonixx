@@ -7530,11 +7530,15 @@ html:has(.autonix-auth-page) {
   color: rgba(0,0,0,.58);
 }
 
-@media (max-width: 420px) {
+@media (max-width: 768px) {
   .notification-panel {
     position: fixed;
-    top: 62px;
+    top: calc(var(--nav-height, 64px) + 8px);
     right: 12px;
-    max-height: calc(100vh - 78px);
+    left: 12px;
+    width: auto;
+    max-width: 420px;
+    margin-left: auto;
+    max-height: calc(100vh - var(--nav-height, 64px) - 24px);
   }
 }
